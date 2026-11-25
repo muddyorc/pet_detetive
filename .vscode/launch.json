@@ -1,0 +1,65 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Teste de fumaça",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/smoke_test.py",
+      "console": "integratedTerminal",
+      "python": "${workspaceFolder}/.venv/Scripts/python.exe"
+    },
+    {
+      "name": "Treinar MobileNetV3",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/train.py",
+      "args": [
+        "--model",
+        "mobilenet",
+        "--epochs",
+        "20"
+      ],
+      "console": "integratedTerminal",
+      "python": "${workspaceFolder}/.venv/Scripts/python.exe"
+    },
+    {
+      "name": "Treinar CNN própria",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/train.py",
+      "args": [
+        "--model",
+        "cnn",
+        "--epochs",
+        "40"
+      ],
+      "console": "integratedTerminal",
+      "python": "${workspaceFolder}/.venv/Scripts/python.exe"
+    },
+    {
+      "name": "Avaliar e comparar",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/evaluate.py",
+      "args": [
+        "--compare"
+      ],
+      "console": "integratedTerminal",
+      "python": "${workspaceFolder}/.venv/Scripts/python.exe"
+    },
+    {
+      "name": "Classificar foto (edite o caminho)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/predict.py",
+      "args": [
+        "minha_foto.jpg",
+        "--model",
+        "mobilenet"
+      ],
+      "console": "integratedTerminal",
+      "python": "${workspaceFolder}/.venv/Scripts/python.exe"
+    }
+  ]
+}

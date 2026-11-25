@@ -1,0 +1,14 @@
+data/
+outputs/
+__pycache__/
+.venv/
+*.pt
+
+# Pesos treinados: versionados de proposito (~14 MB cada, sem estado do
+# otimizador). Com eles no repositorio, predict.py roda em qualquer maquina
+# sem dataset e sem treinar -- e a contingencia real para o dia da exposicao.
+#
+# A pasta checkpoints/ NAO entra na lista acima: o git nao entra num diretorio
+# excluido, e um "!checkpoints/*.pt" depois de "checkpoints/" seria ignorado.
+!checkpoints/*.pt
+!checkpoints/*.json

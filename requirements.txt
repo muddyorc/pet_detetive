@@ -1,0 +1,28 @@
+# Pet Detetive — dependencias
+#
+# Se voce NAO tem GPU NVIDIA, instale o torch pela roda de CPU primeiro
+# (e muito menor, ~200 MB em vez de ~2,5 GB):
+#
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements.txt
+#
+# Com GPU NVIDIA, basta:  pip install -r requirements.txt
+
+torch>=2.2
+torchvision>=0.17
+numpy>=1.26
+pillow>=10.0
+scikit-learn>=1.4
+matplotlib>=3.8
+
+# API e interface (etapa 4)
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+
+# Cliente do SLM local e do LLM (etapa 5)
+requests>=2.31
+
+# Leitura dos parquet em baixar_dataset.py. So e usado nesse script -- quem
+# vai apenas rodar predict.py com os pesos do repositorio nao precisa dele.
+pyarrow>=15.0
