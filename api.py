@@ -29,6 +29,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel
 
+import detector
 import llm
 import slm
 from agente import Agente
@@ -52,6 +53,12 @@ async def ciclo(app: FastAPI):
     estado["roteador"] = roteador
     print(f"  modelo mobilenet, {len(estado['agente'].class_names)} classes")
     print(f"  RAG por {estado['agente'].indice.rota}")
+
+    # Carrega o detector aqui, e nao na primeira foto: os pesos sao baixados
+    # do torchvision na primeira vez (~14 MB) e nao e na frente do visitante
+    # que isso deve acontecer.
+    estado["detector"] = detector.disponivel()
+    print(f"  detector de pet: {'pronto' if estado['detector'] else 'INDISPONIVEL (usa a foto inteira)'}")
 
     # Aquece o SLM. Bloqueia a inicializacao de proposito: e melhor a API
     # demorar para subir do que o primeiro visitante esperar.
@@ -94,6 +101,7 @@ def saude():
         "modelo": a.nome_modelo,
         "dispositivo": str(next(a.modelo.parameters()).device),
         "classes": len(a.class_names),
+        "detector_disponivel": estado.get("detector", False),
         "slm_disponivel": slm.disponivel(),
         "slm_quente": estado.get("slm_quente", False),
         "nuvem_disponivel": llm.disponivel(),

@@ -35,6 +35,7 @@ sobre numeros que a rede ja calculou.
 from __future__ import annotations
 
 import base64
+import io
 import time
 import uuid
 from collections import OrderedDict
@@ -43,6 +44,7 @@ from dataclasses import dataclass, field
 import torch
 from PIL import Image
 
+import detector
 import gradcam
 import predict
 import rag
@@ -210,10 +212,22 @@ class Agente:
 
     # -- fluxos --------------------------------------------------------
     def ver_foto(self, foto: Image.Image, sessao_id: str | None = None) -> dict:
-        """Fluxo completo de POST /classificar."""
+        """Fluxo completo de POST /classificar.
+
+        Localiza o animal ANTES de classificar. Na bancada o visitante mostra
+        a foto na tela do proprio celular, e o quadro vem cheio de pessoa,
+        parede e moldura do aparelho; sem recortar, o `CenterCrop(224)` do
+        pipeline entrega o rosto da pessoa para a rede. Ver detector.py.
+        """
         s = self.sessao(sessao_id)
-        leitura, probs, ms_percepcao = self.classificar(foto)
-        mapa, ms_gradcam = self.explicar(foto)
+
+        achado = detector.localizar(foto)
+        alvo = achado["imagem"]          # recorte, ou a original se nada foi achado
+
+        leitura, probs, ms_percepcao = self.classificar(alvo)
+        # Grad-CAM sobre o MESMO recorte que foi classificado, senao o mapa
+        # explicaria uma imagem diferente da que gerou os palpites.
+        mapa, ms_gradcam = self.explicar(alvo)
 
         s.probabilidades = probs
         s.leitura = leitura
@@ -232,9 +246,19 @@ class Agente:
             "sessao": s.id,
             **leitura.to_dict(),
             "mapa_atencao": mapa,
+            # O que a rede de fato olhou. A tela mostra isto, e nao a foto
+            # original, para que os dois quadros correspondam ao mesmo recorte.
+            "recorte": self._como_data_uri(alvo) if achado["achou"] else None,
+            "deteccao": {
+                "achou": achado["achou"],
+                "especie": achado["especie"],
+                "confianca": round(achado["confianca"], 3),
+                "quantos": achado["quantos"],
+            },
             "mensagem": mensagem,
             "pergunta": pergunta,
             "latencia_ms": {
+                "deteccao": round(achado["ms"]),
                 "percepcao": round(ms_percepcao),
                 "gradcam": round(ms_gradcam),
                 "linguagem": round(tel_msg["latencia_ms"]
@@ -242,6 +266,12 @@ class Agente:
             },
             "rota_linguagem": tel_msg["rota"],
         }
+
+    @staticmethod
+    def _como_data_uri(imagem: Image.Image) -> str:
+        buf = io.BytesIO()
+        imagem.convert("RGB").save(buf, "JPEG", quality=88)
+        return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
 
     def responder(self, sessao_id: str, texto: str) -> dict:
         """Fluxo de POST /responder: texto livre -> campo -> reponderacao."""

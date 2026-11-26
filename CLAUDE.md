@@ -140,6 +140,7 @@ CONFIANCA_BAIXA = 0.30
 ## 3b. Etapas 4 e 5 — construídas em 25/11, funcionando
 
 ```
+detector.py      acha o cao/gato na foto ANTES de classificar
 slm.py           cliente do Ollama: gerar() e extrair() com JSON Schema
 rag.py           busca sobre conhecimento/racas.json (TF-IDF, embeddings opcionais)
 llm.py           cliente da nuvem; sem chave cai no SLM local
@@ -175,6 +176,27 @@ decisão e frases curtas continuam; só o perfil longo degrada, com aviso.
    `valor` separados, "pelo enorme" virava `{"campo":"pelagem","valor":"grande"}`:
    JSON válido, resposta errada. Com `pelo_longo` / `porte_grande` o erro não é
    representável. 5 de 5 casos corretos, incluindo recusar com `nao_sei`.
+
+**O detector existe por causa da bancada.** O visitante nao traz o pet: ele
+mostra uma foto na tela do proprio celular. O quadro vem com a pessoa, a
+parede e a moldura do aparelho, e o `CenterCrop(224)` do pipeline entrega o
+rosto da pessoa para a rede. Medido numa cena em que o pet ocupa 8% do quadro:
+
+| | Resultado | Decisao |
+| --- | --- | --- |
+| sem detector | Siamese 8,5% | perguntar (inutil) |
+| com detector | **Pug 81,0%** | afirmar |
+
+E ele nao custa nada no caso normal — em 40 fotos do dataset, onde o animal ja
+ocupa o quadro, o acerto subiu de 34/40 para **37/40**. Custa ~45 ms.
+
+De quebra, reforca a privacidade: a pessoa que segura o celular e descartada
+em memoria antes de qualquer outra coisa. O rosto dela nao chega no
+classificador nem aparece no mapa de atencao.
+
+A especie que o detector devolve (`cao`/`gato`) e so informativa e **nao vai
+para a tela**: o COCO e generico e erra entre as duas com frequencia — na cena
+de teste chamou um Pug de gato. Quem sabe a especie e a raca classificada.
 
 **"Reclassificar" significa reponderar.** A CNN não aceita texto. O campo
 extraído multiplica os pesos das raças que a base descreve daquele jeito e

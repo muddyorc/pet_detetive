@@ -178,7 +178,7 @@
   <div id="resultado" class="escondido">
     <div class="quadros">
       <div class="quadro">
-        <h2>a foto</h2>
+        <h2 id="titulo-foto">a foto</h2>
         <img id="foto" alt="foto enviada">
       </div>
       <div class="quadro">
@@ -278,6 +278,25 @@ async function carregarMetricas() {
 function desenhar(r) {
   $('resultado').classList.remove('escondido');
   $('mapa').src = r.mapa_atencao;
+
+  /* Quando o detector recorta, a tela mostra o RECORTE, não a foto original.
+     Dois motivos: os dois quadros passam a ser a mesma imagem, então o mapa
+     de atenção corresponde ao que está ao lado; e o visitante vê o que a rede
+     de fato olhou — que é metade da explicação. */
+  if (r.recorte) {
+    $('foto').src = r.recorte;
+    const d = r.deteccao;
+    /* Não mostramos a espécie que o detector diz. Ele é genérico (COCO) e
+       erra entre cão e gato com frequência — na cena de teste chamou um Pug
+       de 'gato'. Quem sabe a espécie é o classificador de raça, pela raça que
+       devolve. Mostrar as duas opiniões só criaria contradição na tela. */
+    $('titulo-foto').textContent = 'o que a rede olhou — animal recortado' +
+      (d.quantos > 1 ? ` · ${d.quantos} animais no quadro` : '');
+  } else if (r.deteccao && !r.deteccao.achou) {
+    $('titulo-foto').textContent = 'a foto inteira — não achei um cão ou gato nítido';
+  } else if (r.deteccao) {
+    $('titulo-foto').textContent = 'a foto';
+  }
   $('decisao').textContent = r.decisao;
   $('decisao').className = 'decisao ' + r.decisao;
   $('mensagem').textContent = r.mensagem;
@@ -305,6 +324,7 @@ function desenhar(r) {
 
   const l = r.latencia_ms || {};
   $('latencias').innerHTML =
+    (l.deteccao != null ? `detecção <b>${l.deteccao} ms</b> · ` : '') +
     `percepção <b>${l.percepcao ?? '—'} ms</b> · grad-cam <b>${l.gradcam ?? '—'} ms</b> · ` +
     `linguagem <b>${l.linguagem ?? '—'} ms</b> pela rota <b class="${r.rota_linguagem}">${r.rota_linguagem}</b>`;
 
