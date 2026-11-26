@@ -184,11 +184,17 @@ class Indice:
 
         indices = np.array(list(candidatos))
         pontos = self._matriz[indices] @ v
-        melhores = indices[np.argsort(-pontos)[:k]]
+        ordem = np.argsort(-pontos)[:k]
+        melhores = indices[ordem]
         return ([self.trechos[i] for i in melhores],
                 {"rota": self.rota,
                  "latencia_ms": (time.perf_counter() - t0) * 1000,
-                 "encontrados": len(melhores)})
+                 "encontrados": len(melhores),
+                 # A similaridade do melhor trecho. O roteador usa isso para
+                 # decidir entre o SLM local e a nuvem: quando a resposta esta
+                 # literalmente na base, um modelo pequeno so precisa
+                 # reescrever; quando nao esta, alguem tem que raciocinar.
+                 "similaridade": float(pontos[ordem[0]]) if len(ordem) else 0.0})
 
     def perfil_bruto(self, raca: str) -> list[Trecho]:
         """Todos os trechos de uma raca, na ordem de ORDEM_CAMPOS.

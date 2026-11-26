@@ -225,6 +225,7 @@ quebra exatamente a tese de privacidade do projeto.
 | `POST /classificar` | foto → palpites, mapa de atenção, decisão, frase |
 | `POST /responder` | texto livre do visitante → reponderação dos palpites |
 | `POST /perfil` | perfil longo da raça |
+| `POST /perguntar` | pergunta aberta sobre o animal; `aprofundar: true` manda para a nuvem |
 | `GET /metricas` | contadores do evento |
 | `GET /exemplos` | quantas fotos há para sortear |
 | `GET /exemplos/aleatorio` | uma foto qualquer do banco, com a raça verdadeira no cabeçalho |

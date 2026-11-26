@@ -124,6 +124,7 @@ class Sessao:
     probabilidades: list[float] = field(default_factory=list)
     leitura: predict.Leitura | None = None
     refinamentos: list[dict] = field(default_factory=list)
+    conversa: list[dict] = field(default_factory=list)
     perfis_entregues: set[str] = field(default_factory=set)
 
 
@@ -306,6 +307,45 @@ class Agente:
             "latencia_ms": {"linguagem": round(tel["latencia_ms"] + tel_msg["latencia_ms"])},
             "rota_linguagem": tel_msg["rota"],
         }
+
+    def perguntar(self, sessao_id: str, pergunta: str,
+                  aprofundar: bool = False) -> dict:
+        """Chat sobre o animal, ancorado na base de conhecimento.
+
+        A recuperacao e escopada na raca do topo da sessao. Se o visitante
+        citar OUTRA raca pelo nome ("qual a diferenca pro Ragdoll?"), os
+        trechos das duas entram -- essa deteccao e por casamento exato com
+        class_names, entao nao erra, ao contrario de pedir ao SLM que
+        classifique a pergunta (ver roteador.perguntar).
+        """
+        s = self.sessao(sessao_id)
+        if not s.leitura:
+            raise ValueError("sessao sem foto classificada")
+
+        raca = s.leitura.palpites[0].raca
+        achados, tel_rag = self.indice.buscar(pergunta, k=4, raca=raca)
+        trechos = [str(t) for t in achados]
+
+        # Outra raca citada na pergunta: traz o verbete dela tambem.
+        pergunta_min = pergunta.lower()
+        citadas = [n for n in self.class_names
+                   if n.lower() != raca.lower() and n.lower() in pergunta_min]
+        for outra in citadas[:1]:
+            trechos += [str(t) for t in self.indice.perfil_bruto(outra)]
+
+        texto, tel = self.roteador.perguntar(
+            pergunta, trechos, s.conversa, aprofundar=aprofundar)
+
+        s.conversa.append({"papel": "user", "texto": pergunta})
+        s.conversa.append({"papel": "assistant", "texto": texto})
+        del s.conversa[:-12]            # memoria curta: 6 trocas por sessao
+
+        return {"texto": texto, "rota": tel["rota"],
+                "latencia_ms": round(tel["latencia_ms"]),
+                "comparou_com": citadas[0] if citadas else None,
+                "trechos_usados": len(trechos),
+                "rag_ms": round(tel_rag["latencia_ms"], 1),
+                "pode_aprofundar": tel["rota"] != "nuvem"}
 
     def perfil(self, sessao_id: str, raca: str) -> dict:
         s = self.sessao(sessao_id)

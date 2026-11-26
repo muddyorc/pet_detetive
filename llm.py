@@ -127,6 +127,80 @@ def _pela_nuvem(raca: str, trechos: list[str]) -> tuple[str, dict]:
     }
 
 
+SISTEMA_PERGUNTA = (
+    "Voce responde perguntas de visitantes de uma feira de ciencias sobre racas "
+    "de caes e gatos, a partir de uma base de conhecimento fornecida.\n\n"
+    "REGRAS:\n"
+    "- Responda a pergunta DIRETAMENTE, na primeira frase.\n"
+    "- Use os dados fornecidos como base. Se a pergunta exigir algo que nao "
+    "esta neles, diga o que a base sustenta e seja explicito sobre o que e "
+    "inferencia sua.\n"
+    "- Se a pergunta nao for sobre o animal, diga isso em uma frase.\n"
+    "- A rede neural mede SEMELHANCA VISUAL com 37 racas puras. Fale em termos "
+    "de aparencia: 'se parece com', 'lembra'.\n"
+    "- Portugues do Brasil, tom sobrio. No maximo 4 frases."
+)
+
+
+def responder(pergunta: str, trechos: list[str],
+              historico: list[dict] | None = None) -> tuple[str, dict]:
+    """Pergunta aberta do visitante, respondida pela nuvem.
+
+    Recebe a pergunta (texto que o visitante digitou) e os trechos que o RAG
+    recuperou. **Nunca a imagem** -- vale a mesma garantia de `perfil()`: a
+    assinatura aceita str, e nao existe caminho neste modulo que leve bytes de
+    foto para a rede.
+
+    O historico e so texto da propria conversa, para o modelo nao repetir o
+    que ja disse.
+    """
+    if not disponivel():
+        raise SemNuvem("sem ANTHROPIC_API_KEY configurada")
+
+    import anthropic
+
+    corpo = "\n".join(f"- {t}" for t in trechos)
+    mensagens: list[dict] = []
+    for turno in (historico or [])[-6:]:          # 3 trocas bastam de contexto
+        mensagens.append({"role": turno["papel"], "content": turno["texto"]})
+    mensagens.append({
+        "role": "user",
+        "content": f"Base de conhecimento:\n{corpo}\n\nPergunta do visitante: {pergunta}",
+    })
+
+    cliente = anthropic.Anthropic(timeout=TIMEOUT_S, max_retries=1)
+    t0 = time.perf_counter()
+    try:
+        r = cliente.beta.messages.create(
+            model=MODELO,
+            max_tokens=1000,
+            output_config={"effort": "low"},
+            betas=["server-side-fallback-2026-07-01"],
+            fallbacks="default",
+            system=SISTEMA_PERGUNTA,
+            messages=mensagens,
+        )
+    except anthropic.APIError as e:
+        raise SemNuvem(f"API respondeu com erro: {e}") from e
+    except Exception as e:
+        raise SemNuvem(f"falha de rede: {e}") from e
+
+    if r.stop_reason == "refusal":
+        raise SemNuvem("a API recusou a solicitacao")
+
+    texto = "".join(b.text for b in r.content if b.type == "text").strip()
+    if not texto:
+        raise SemNuvem("resposta vazia")
+
+    return texto, {
+        "rota": "nuvem",
+        "modelo": MODELO,
+        "latencia_ms": (time.perf_counter() - t0) * 1000,
+        "tokens_entrada": r.usage.input_tokens,
+        "tokens_saida": r.usage.output_tokens,
+    }
+
+
 def _pelo_slm(raca: str, trechos: list[str]) -> tuple[str, dict]:
     """Fallback local. Texto mais simples, mesma garantia de nao inventar."""
     import slm

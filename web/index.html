@@ -108,6 +108,17 @@
   .gabarito.certo  { color: var(--destaque); border-color: #1e5d54; }
   .gabarito.errado { color: var(--alerta);   border-color: #6b4e13; }
 
+  .turno { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--borda); }
+  .turno .quem { font-size: 12px; text-transform: uppercase; letter-spacing: .07em;
+                 color: var(--fraco); margin-bottom: 5px; }
+  .turno .texto { white-space: pre-wrap; line-height: 1.6; }
+  .turno .pe { display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+               margin-top: 9px; font-size: 12px; color: var(--fraco); }
+  .aprofundar { appearance: none; background: none; border: 1px solid var(--nuvem);
+                color: var(--nuvem); font-size: 12px; padding: 4px 11px;
+                border-radius: 999px; cursor: pointer; }
+  .aprofundar:disabled { opacity: .45; cursor: default; }
+
   .refino { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--borda); }
   .pergunta { font-size: 17px; color: var(--duvida); margin-bottom: 10px; }
   .linha { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -213,6 +224,21 @@
       </div>
       <div class="perfil" id="perfil" style="margin-top: 12px;"></div>
       <div class="rotulo-rota" id="rota-perfil"></div>
+    </div>
+
+    <div class="cartao">
+      <strong>Pergunte sobre este animal</strong>
+      <div class="nota" style="margin-top: 4px;">
+        As respostas saem da base de conhecimento local. Toda pergunta é
+        respondida aqui na máquina; só se você pedir para aprofundar é que o
+        modelo em nuvem entra.
+      </div>
+      <div id="conversa"></div>
+      <form class="linha" id="forma-pergunta" style="margin-top: 12px;">
+        <input type="text" id="texto-pergunta" autocomplete="off"
+               placeholder="ele solta muito pelo? serve para apartamento?">
+        <button class="botao" type="submit">Perguntar</button>
+      </form>
     </div>
   </div>
 
@@ -338,6 +364,7 @@ function desenhar(r) {
     g.className = 'gabarito escondido';
   }
 
+  if (r.mapa_atencao !== undefined) $('conversa').innerHTML = '';
   racaTopo = r.palpites[0].raca;
   $('titulo-perfil').textContent = 'Perfil de ' + racaTopo;
   $('perfil').textContent = '';
@@ -523,6 +550,69 @@ $('forma-refino').onsubmit = async (e) => {
     }
   } catch { $('aviso').textContent = 'não consegui processar a resposta'; }
   finally { $('refino').classList.remove('girando'); }
+};
+
+/* ------------------------------------------------------------------
+   Chat sobre o animal.
+
+   Toda pergunta é respondida LOCALMENTE primeiro. Sob a resposta aparece
+   "aprofundar com o modelo em nuvem", e só então a nuvem entra.
+
+   A rota não é adivinhada de propósito: tentamos decidir pela similaridade
+   do RAG (faixas sobrepostas) e pedindo ao SLM que classificasse a pergunta
+   (7/12, dizendo "precisa pensar" quase sempre). Ver roteador.perguntar.
+   Deixar a escolha visível faz o visitante sentir a diferença de latência e
+   profundidade entre as duas rotas — que é a tese de ESW489 demonstrada em
+   vez de afirmada. ------------------------------------------------------ */
+function pintarTurno(pergunta) {
+  const div = document.createElement('div');
+  div.className = 'turno';
+  div.innerHTML = `<div class="quem">você</div><div class="texto"></div>
+    <div class="quem" style="margin-top:11px">resposta</div>
+    <div class="texto resposta">pensando…</div><div class="pe"></div>`;
+  div.querySelector('.texto').textContent = pergunta;
+  $('conversa').appendChild(div);
+  return div;
+}
+
+async function perguntar(pergunta, aprofundar, div) {
+  const resp = await fetch('/perguntar', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessao, pergunta, aprofundar }),
+  });
+  if (!resp.ok) throw new Error('não consegui responder agora');
+  const r = await resp.json();
+
+  div.querySelector('.resposta').textContent = r.texto;
+  const pe = div.querySelector('.pe');
+  pe.innerHTML =
+    `<span>rota <b class="${r.rota}">${r.rota}</b> · ${r.latencia_ms} ms · ` +
+    `${r.trechos_usados} trechos da base (RAG ${r.rag_ms} ms)` +
+    (r.comparou_com ? ` · comparou com ${r.comparou_com}` : '') + '</span>';
+
+  if (r.pode_aprofundar) {
+    const b = document.createElement('button');
+    b.className = 'aprofundar';
+    b.textContent = 'aprofundar com o modelo em nuvem ↗';
+    b.onclick = async () => {
+      b.disabled = true;
+      div.querySelector('.resposta').textContent = 'consultando a nuvem…';
+      try { await perguntar(pergunta, true, div); }
+      catch (e) { div.querySelector('.resposta').textContent = e.message; }
+    };
+    pe.appendChild(b);
+  }
+  carregarMetricas();
+}
+
+$('forma-pergunta').onsubmit = async (e) => {
+  e.preventDefault();
+  const q = $('texto-pergunta').value.trim();
+  if (!q || !sessao) return;
+  $('texto-pergunta').value = '';
+  const div = pintarTurno(q);
+  try { await perguntar(q, false, div); }
+  catch (err) { div.querySelector('.resposta').textContent = err.message; }
 };
 
 $('botao-perfil').onclick = async () => {

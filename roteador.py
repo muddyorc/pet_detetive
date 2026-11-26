@@ -202,6 +202,62 @@ class Roteador:
             return {}, {"rota": "reserva", "latencia_ms": 0.0,
                         "tokens_entrada": 0, "tokens_saida": 0}
 
+    def perguntar(self, pergunta: str, trechos: list[str],
+                  historico: list[dict] | None = None,
+                  aprofundar: bool = False) -> tuple[str, dict]:
+        """Pergunta aberta do visitante.
+
+        POR QUE A ROTA NAO E ADIVINHADA
+        -------------------------------
+        A ideia obvia seria o roteador decidir sozinho se a pergunta precisa da
+        nuvem. Tentamos duas formas e as duas falharam, entao a decisao ficou
+        visivel em vez de automatica:
+
+        1. Pela similaridade do RAG. Nao separa: perguntas respondidas pela
+           base deram 0,027 a 0,343, e perguntas que exigem raciocinio, 0,044 a
+           0,129. Faixas sobrepostas. "quanto ele pesa?" pontua 0,039 porque a
+           base diz "6 a 8 kg", nao "pesa".
+
+        2. Pedindo ao SLM que classifique a pergunta. Com quatro classes:
+           6/12. Reduzindo para um booleano `precisa_pensar`: 7/12, e olhando
+           as respostas ele diz `true` quase sempre -- classificador
+           degenerado, nao roteador. Um 3B colapsa nesse tipo de juizo.
+
+        O QUE FAZEMOS
+        -------------
+        Toda pergunta e respondida LOCALMENTE primeiro, em um a tres segundos.
+        Sob a resposta, o visitante pode pedir para aprofundar, e so ai a
+        nuvem entra (`aprofundar=True`).
+
+        Isso e melhor que acertar o roteamento escondido: o visitante ve as
+        duas rotas e sente a diferenca de latencia e de profundidade. A tese
+        de ESW489 -- o caminho quente e local, a nuvem e excecao -- deixa de
+        ser uma afirmacao do banner e vira algo demonstravel na bancada. E
+        nenhum roteamento errado e possivel.
+        """
+        if aprofundar and llm.disponivel():
+            try:
+                texto, tel = llm.responder(pergunta, trechos, historico)
+                termo = slm.violou_guardrail(texto)
+                if termo:
+                    texto = ("Nao consegui responder isso sem escorregar no "
+                             "vocabulario de genetica. O que a base diz:\n\n"
+                             + "\n".join(trechos[:3]))
+                    tel = {**tel, "rota": "base", "guardrail": termo}
+                self.metricas.registrar("pergunta_aberta", tel["rota"],
+                                        tel["latencia_ms"], tel["tokens_entrada"],
+                                        tel["tokens_saida"])
+                return texto, tel
+            except llm.SemNuvem:
+                pass            # cai no local, como todo o resto do sistema
+
+        corpo = "\n".join(f"- {t}" for t in trechos)
+        prompt = (f"Base de conhecimento:\n{corpo}\n\n"
+                  f"Pergunta do visitante: {pergunta}\n\n"
+                  "Responda em no maximo duas frases, direto ao ponto, usando a base.")
+        reserva = "O que a base diz sobre isso:\n\n" + "\n".join(trechos[:2])
+        return self._curto("pergunta_aberta", prompt, reserva, max_tokens=150)
+
     def perfil(self, raca: str, trechos: list[str]) -> tuple[str, dict]:
         """Perfil longo. A unica tarefa que tenta a nuvem."""
         texto, tel = llm.perfil(raca, trechos)

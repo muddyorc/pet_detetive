@@ -210,6 +210,32 @@ A especie que o detector devolve (`cao`/`gato`) e so informativa e **nao vai
 para a tela**: o COCO e generico e erra entre as duas com frequencia — na cena
 de teste chamou um Pug de gato. Quem sabe a especie e a raca classificada.
 
+**O chat nao adivinha a rota, e isso foi medido.** `POST /perguntar` responde
+toda pergunta LOCALMENTE primeiro; sob a resposta o visitante pode pedir para
+aprofundar, e so ai a nuvem entra. Tentamos decidir sozinhos de duas formas,
+e as duas falharam:
+
+| Tentativa | Resultado |
+| --- | --- |
+| limiar de similaridade do RAG | nao separa: base 0,027–0,343, raciocinio 0,044–0,129 |
+| SLM classificando em 4 tipos | 6/12 |
+| SLM com booleano `precisa_pensar` | 7/12, dizendo `true` quase sempre (degenerado) |
+
+Deixar a escolha visivel e melhor que acertar escondido: o visitante ve as
+duas rotas, sente a diferenca de latencia e profundidade, e nenhum roteamento
+errado e possivel. A tese de ESW489 deixa de ser afirmacao de banner e vira
+demonstracao.
+
+A unica regra automatica e deterministica: se a pergunta citar OUTRA raca pelo
+nome, os trechos das duas entram na recuperacao. Casamento exato contra
+`class_names`, entao nao erra.
+
+**Latencia do chat local: ~3 s** no `llama3.2:3b` com a GTX 1660 SUPER (2-3 s
+tipicos, 62 tok/s de geracao, 100% GPU confirmado por `ollama ps`). Reduzir o
+contexto do RAG nao ajuda -- medimos k=4, 3 e 2 e deu 2,8 / 2,9 / 3,1 s: o
+custo esta na geracao, nao no prompt. Para reduzir a espera PERCEBIDA o
+caminho e streaming, nao menos contexto.
+
 **"Reclassificar" significa reponderar.** A CNN não aceita texto. O campo
 extraído multiplica os pesos das raças que a base descreve daquele jeito e
 renormaliza — a rede continua sendo a única evidência visual, o texto desempata.

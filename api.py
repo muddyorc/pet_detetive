@@ -87,6 +87,12 @@ class Resposta(BaseModel):
     texto: str
 
 
+class Pergunta(BaseModel):
+    sessao: str
+    pergunta: str
+    aprofundar: bool = False
+
+
 class PedidoPerfil(BaseModel):
     sessao: str
     raca: str
@@ -157,6 +163,20 @@ def perfil(corpo: PedidoPerfil):
     if corpo.raca not in a.class_names:
         raise HTTPException(404, f"raca desconhecida: {corpo.raca}")
     return a.perfil(corpo.sessao, corpo.raca)
+
+
+@app.post("/perguntar")
+def perguntar(corpo: Pergunta):
+    a = estado.get("agente")
+    if a is None:
+        raise HTTPException(503, "ainda inicializando")
+    if not corpo.pergunta.strip():
+        raise HTTPException(400, "pergunta vazia")
+    try:
+        return a.perguntar(corpo.sessao, corpo.pergunta.strip(),
+                           corpo.aprofundar)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 @app.get("/metricas")
