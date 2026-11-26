@@ -148,13 +148,30 @@ O `predict.py` já imprime a decisão do agente: `afirmar`, `comparar` ou
 ## Estrutura
 
 ```
-data.py        download, split estratificado, aumento de dados
-models.py      PetCNN (do zero) e MobileNetV3Transfer (transferência)
-train.py       loop de treino, parada antecipada, checkpoints
-evaluate.py    métricas, matriz de confusão, tabela comparativa
-gradcam.py     mapa de atenção sobre a foto original
-predict.py     inferência e a regra de decisão por confiança
-smoke_test.py  verificação rápida sem dataset
+Percepção (etapas 1 a 3)
+  baixar_dataset.py  monta o Oxford-IIIT Pet rápido (HF + anotações)
+  data.py            split estratificado, aumento de dados
+  models.py          PetCNN (do zero) e MobileNetV3Transfer (transferência)
+  train.py           loop de treino, parada antecipada, checkpoints
+  evaluate.py        métricas, matriz de confusão, tabela comparativa
+  gradcam.py         mapa de atenção sobre a foto original
+  predict.py         inferência e a regra de decisão por confiança
+
+Linguagem (etapas 4 e 5)
+  slm.py             Ollama: gerar() e extrair() com JSON Schema
+  rag.py             busca sobre conhecimento/racas.json
+  llm.py             nuvem; sem chave cai no SLM local
+  roteador.py        decide local/nuvem por tarefa e conta tudo
+  agente.py          orquestra, memória por sessão, reponderação
+  api.py             FastAPI
+  web/index.html     interface única, sem framework
+
+Verificação
+  smoke_test.py      rápida, sem dataset
+  teste_offline.py   aceitação da etapa 5: sistema sem rede
+
+Dados
+  conhecimento/racas.json   37 raças × 7 campos
 ```
 
 ## Ajuste da regra de decisão
@@ -170,11 +187,41 @@ CONFIANCA_BAIXA = 0.30   # topo abaixo disso: pergunta ao visitante
 Calibre depois de ver a distribuição real de confianças no conjunto de teste.
 Se o sistema ficar perguntando demais na bancada, suba `CONFIANCA_BAIXA`.
 
-## O que ainda falta (etapa 5)
+## Etapas 4 e 5 — subir o sistema
 
-API FastAPI, interface web, base de RAG, SLM local via Ollama e a camada de
-roteamento. Essa parte entra depois que a classificação estiver funcionando
-com fotos reais — não antes.
+```bash
+uvicorn api:app --reload
+```
+
+E abra `http://localhost:8000`. A API carrega o modelo e o índice uma vez e
+**aquece o SLM na inicialização** — sem isso o primeiro visitante esperaria uns
+75 segundos pela primeira frase. Sobe em cerca de 4 segundos.
+
+| Rota | O que faz |
+| --- | --- |
+| `GET /` | a interface |
+| `GET /saude` | modelo, dispositivo, e se SLM e nuvem estão no ar |
+| `POST /classificar` | foto → palpites, mapa de atenção, decisão, frase |
+| `POST /responder` | texto livre do visitante → reponderação dos palpites |
+| `POST /perfil` | perfil longo da raça |
+| `GET /metricas` | contadores do evento |
+| `GET /exemplos` | galeria para quem não tem pet |
+
+### O teste que vale mais que os outros
+
+```bash
+python teste_offline.py
+```
+
+Simula o Ollama e a nuvem fora do ar. Classificação, mapa, decisão e frases
+curtas têm que continuar funcionando; só o perfil longo degrada, e com aviso.
+Se qualquer outra coisa quebrar, o roteamento está errado.
+
+### Sem a chave da API
+
+O sistema funciona. Sem `ANTHROPIC_API_KEY`, o perfil longo é escrito pelo SLM
+local em vez da nuvem, e a interface mostra a rota usada. Essa degradação é por
+especificação, não um defeito: `GET /saude` informa `nuvem_disponivel: false`.
 
 ## Uma regra que vale mais que o código
 
