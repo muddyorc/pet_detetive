@@ -49,6 +49,27 @@
 
   .aviso { color: var(--alerta); font-size: 14px; min-height: 20px; margin-top: 4px; }
 
+  /* Camera ao vivo. O quadro fica quadrado porque o pipeline de avaliacao faz
+     CenterCrop(224) -- o que estiver fora do quadrado nao chega na rede.
+     Mostrar o recorte real evita o visitante enquadrar o pet na lateral e o
+     sistema classificar o sofa. */
+  .camera { position: relative; max-width: 460px; margin-top: 16px;
+            border: 1px solid var(--borda); border-radius: 12px;
+            overflow: hidden; background: #0a0c10; }
+  .camera video, .camera canvas { display: block; width: 100%; aspect-ratio: 1;
+                                  object-fit: cover; }
+  /* Espelhado so na visualizacao: o treino usa RandomHorizontalFlip, entao a
+     rede e indiferente, e a pessoa se enxerga como num espelho. */
+  .camera video.espelho { transform: scaleX(-1); }
+  .guia { position: absolute; inset: 9%; border: 2px dashed rgba(94,234,212,.5);
+          border-radius: 8px; pointer-events: none; }
+  .guia::after { content: "enquadre o pet aqui"; position: absolute; left: 0;
+                 right: 0; bottom: -26px; text-align: center; font-size: 12px;
+                 color: var(--fraco); }
+  .camera-acoes { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 34px; }
+  select { background: var(--painel); color: var(--texto); font-size: 14px;
+           border: 1px solid var(--borda); border-radius: 9px; padding: 11px 12px; }
+
   .quadros { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; }
   @media (max-width: 720px) { .quadros { grid-template-columns: 1fr; } }
   .quadro { background: var(--painel); border: 1px solid var(--borda);
@@ -132,10 +153,24 @@
   <div class="envio">
     <label class="botao principal" for="arquivo">Escolher uma foto</label>
     <input type="file" id="arquivo" accept="image/*">
-    <label class="botao" for="camera">Tirar foto agora</label>
+    <label class="botao" for="camera">Usar a câmera do celular</label>
     <input type="file" id="camera" accept="image/*" capture="environment">
+    <button class="botao" id="botao-ligar">Ligar a câmera aqui</button>
   </div>
   <div class="aviso" id="aviso"></div>
+
+  <div class="camera escondido" id="bloco-camera">
+    <video id="video" playsinline muted class="espelho"></video>
+    <canvas id="congelado" class="escondido"></canvas>
+    <div class="guia" id="guia"></div>
+  </div>
+  <div class="camera-acoes escondido" id="acoes-camera">
+    <button class="botao principal" id="botao-disparar">Tirar a foto</button>
+    <button class="botao escondido" id="botao-refazer">Tirar outra</button>
+    <button class="botao escondido" id="botao-usar">Usar esta</button>
+    <select id="dispositivos" class="escondido"></select>
+    <button class="botao" id="botao-desligar">Desligar</button>
+  </div>
 
   <div id="galeria-bloco" class="escondido">
     <div class="nota">Sem um pet por perto? Use uma destas:</div>
@@ -305,6 +340,122 @@ async function enviar(arquivo) {
 
 $('arquivo').onchange = (e) => e.target.files[0] && enviar(e.target.files[0]);
 $('camera').onchange  = (e) => e.target.files[0] && enviar(e.target.files[0]);
+
+/* ------------------------------------------------------------------
+   Câmera ao vivo.
+
+   Para a bancada isto vale mais que o seletor de arquivos: a câmera fica
+   ligada o dia todo e cada visitante é um clique, sem diálogo do sistema
+   no meio.
+
+   Duas restrições reais moldam o código abaixo:
+
+   1. getUserMedia só existe em contexto seguro — HTTPS ou localhost. No
+      notebook da bancada (localhost) funciona; se alguém abrir pelo IP da
+      rede (http://192.168.x.x:8000) o navegador bloqueia, sem exceção. Por
+      isso o botão se esconde sozinho e o seletor de arquivo continua ali.
+
+   2. O pipeline faz CenterCrop(224). Capturamos o maior quadrado central do
+      quadro, que é exatamente o que a rede vai ver.
+   ------------------------------------------------------------------ */
+let fluxo = null, blobCapturado = null;
+
+const podeCamera = () =>
+  window.isSecureContext && navigator.mediaDevices?.getUserMedia;
+
+function mostrarAcoes(estado) {
+  // 'ao-vivo' = mostrando a câmera; 'congelado' = revisando a foto tirada.
+  $('botao-disparar').classList.toggle('escondido', estado !== 'ao-vivo');
+  $('botao-refazer').classList.toggle('escondido', estado !== 'congelado');
+  $('botao-usar').classList.toggle('escondido', estado !== 'congelado');
+  $('video').classList.toggle('escondido', estado === 'congelado');
+  $('congelado').classList.toggle('escondido', estado !== 'congelado');
+  $('guia').classList.toggle('escondido', estado === 'congelado');
+}
+
+async function listarCameras() {
+  try {
+    const todos = await navigator.mediaDevices.enumerateDevices();
+    const cams = todos.filter((d) => d.kind === 'videoinput');
+    if (cams.length < 2) return;                 // seletor só aparece se útil
+    $('dispositivos').classList.remove('escondido');
+    $('dispositivos').innerHTML = cams
+      .map((c, i) => `<option value="${c.deviceId}">${c.label || 'Câmera ' + (i + 1)}</option>`)
+      .join('');
+  } catch {}
+}
+
+async function ligarCamera(deviceId) {
+  try {
+    if (fluxo) fluxo.getTracks().forEach((t) => t.stop());
+    fluxo = await navigator.mediaDevices.getUserMedia({
+      video: deviceId
+        ? { deviceId: { exact: deviceId } }
+        // 'environment' pega a traseira no celular e é ignorado no notebook.
+        : { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 1280 } },
+      audio: false,
+    });
+    $('video').srcObject = fluxo;
+    await $('video').play();
+
+    // Espelha só se for câmera frontal: numa traseira o espelho confunde.
+    const ajustes = fluxo.getVideoTracks()[0].getSettings();
+    $('video').classList.toggle('espelho', ajustes.facingMode !== 'environment');
+
+    $('bloco-camera').classList.remove('escondido');
+    $('acoes-camera').classList.remove('escondido');
+    $('botao-ligar').classList.add('escondido');
+    mostrarAcoes('ao-vivo');
+    listarCameras();                             // os rótulos só vêm após permissão
+    $('aviso').textContent = '';
+  } catch (e) {
+    $('aviso').textContent = e.name === 'NotAllowedError'
+      ? 'permissão de câmera negada — use "Escolher uma foto"'
+      : 'não consegui abrir a câmera: ' + e.name;
+  }
+}
+
+function desligarCamera() {
+  if (fluxo) fluxo.getTracks().forEach((t) => t.stop());
+  fluxo = null;
+  $('bloco-camera').classList.add('escondido');
+  $('acoes-camera').classList.add('escondido');
+  $('botao-ligar').classList.remove('escondido');
+}
+
+function disparar() {
+  const v = $('video');
+  // Maior quadrado central do quadro: é o que sobrevive ao CenterCrop.
+  const lado = Math.min(v.videoWidth, v.videoHeight);
+  const x = (v.videoWidth - lado) / 2, y = (v.videoHeight - lado) / 2;
+
+  const c = $('congelado');
+  c.width = c.height = Math.min(lado, 900);      // 900px basta para 224 e sobra
+  c.getContext('2d').drawImage(v, x, y, lado, lado, 0, 0, c.width, c.height);
+
+  // Congela antes de enviar: pet se mexe, e a primeira foto costuma sair
+  // tremida. Deixar conferir evita classificar um borrão.
+  c.toBlob((b) => { blobCapturado = b; mostrarAcoes('congelado'); }, 'image/jpeg', 0.92);
+}
+
+$('botao-ligar').onclick = () => ligarCamera();
+$('botao-desligar').onclick = desligarCamera;
+$('botao-disparar').onclick = disparar;
+$('botao-refazer').onclick = () => { blobCapturado = null; mostrarAcoes('ao-vivo'); };
+$('botao-usar').onclick = () => {
+  if (!blobCapturado) return;
+  enviar(new File([blobCapturado], 'camera.jpg', { type: 'image/jpeg' }));
+  mostrarAcoes('ao-vivo');                       // já pronta para o próximo visitante
+};
+$('dispositivos').onchange = (e) => ligarCamera(e.target.value);
+
+if (!podeCamera()) {
+  $('botao-ligar').classList.add('escondido');
+  if (!window.isSecureContext) {
+    $('aviso').textContent =
+      'câmera ao vivo indisponível: o navegador só a libera em localhost ou HTTPS.';
+  }
+}
 
 $('forma-refino').onsubmit = async (e) => {
   e.preventDefault();
