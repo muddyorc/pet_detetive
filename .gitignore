@@ -12,3 +12,15 @@ __pycache__/
 # excluido, e um "!checkpoints/*.pt" depois de "checkpoints/" seria ignorado.
 !checkpoints/*.pt
 !checkpoints/*.json
+
+# Galeria: as imagens vem do Oxford-IIIT Pet. Usar na propria maquina e
+# tranquilo; redistribuir num repositorio publico e outra conversa.
+# Veja web/exemplos/LEIA.md para repovoar.
+web/exemplos/*.jpg
+web/exemplos/*.jpeg
+web/exemplos/*.png
+web/exemplos/*.webp
+
+# Cache de vetores do RAG, reconstruido sozinho.
+conhecimento/_vetores.npz
+.env

@@ -26,3 +26,7 @@ requests>=2.31
 # Leitura dos parquet em baixar_dataset.py. So e usado nesse script -- quem
 # vai apenas rodar predict.py com os pesos do repositorio nao precisa dele.
 pyarrow>=15.0
+
+# Cliente do LLM em nuvem (llm.py). O sistema funciona sem chave de API:
+# sem ela o perfil longo cai no SLM local, por especificacao.
+anthropic>=0.40

@@ -1,0 +1,346 @@
+{
+  "_sobre": "Base de conhecimento do Pet Detetive. Uma entrada por raca do Oxford-IIIT Pet. Escrita de forma sobria e verificavel: e esta base que impede alucinacao, entao nada aqui deve ser adjetivo de catalogo de canil. Os nomes das chaves sao exatamente os de checkpoints/class_names.json.",
+  "_campos": {
+    "especie": "cao ou gato",
+    "temperamento": "como costuma se comportar, sem superlativo",
+    "porte": "faixa de peso e altura tipicas de adulto",
+    "energia": "quanto exercicio pede por dia",
+    "pelagem": "tipo de pelo e o que isso implica",
+    "cuidados": "o que o tutor precisa fazer com regularidade",
+    "sinais_distintivos": "o que a rede provavelmente olhou na foto"
+  },
+
+  "Abyssinian": {
+    "especie": "gato",
+    "temperamento": "Ativo e curioso. Costuma acompanhar o tutor pela casa e investigar tudo; raramente fica parado no colo.",
+    "porte": "3 a 5 kg.",
+    "energia": "Alta para um gato. Pede prateleiras, arranhadores altos e brincadeiras diarias.",
+    "pelagem": "Curta, rente ao corpo, com efeito tiquetado: cada pelo tem faixas claras e escuras alternadas.",
+    "cuidados": "Escovacao semanal basta. Precisa de espaco vertical mais do que de cuidado com o pelo.",
+    "sinais_distintivos": "Pelo tiquetado sem listras definidas, orelhas grandes em relacao a cabeca, corpo esguio e musculoso."
+  },
+  "American Bulldog": {
+    "especie": "cao",
+    "temperamento": "Confiante e apegado a familia. Precisa de socializacao desde filhote por causa do porte e da forca.",
+    "porte": "27 a 45 kg, 50 a 70 cm de altura.",
+    "energia": "Media a alta. Caminhadas longas e trabalho mental diario.",
+    "pelagem": "Curta e densa. Solta pelo o ano todo.",
+    "cuidados": "Escovacao semanal. Limpar as dobras do focinho. Atencao ao calor: focinho curto dificulta a troca de calor.",
+    "sinais_distintivos": "Cabeca larga e quadrada, mandibula forte, peito profundo, geralmente branco com manchas."
+  },
+  "American Pit Bull Terrier": {
+    "especie": "cao",
+    "temperamento": "Energico e muito ligado a pessoas. Exige tutor presente e socializacao consistente.",
+    "porte": "14 a 27 kg, 43 a 53 cm.",
+    "energia": "Alta. Precisa de exercicio diario de verdade, nao so quintal.",
+    "pelagem": "Curta, lisa e brilhante, de manutencao simples.",
+    "cuidados": "Escovacao semanal. Protecao solar em areas de pelo claro e ralo.",
+    "sinais_distintivos": "Cabeca em forma de cunha, musculatura marcada nos ombros, corpo compacto. Confunde-se com o Staffordshire Bull Terrier, que e menor e mais atarracado."
+  },
+  "Basset Hound": {
+    "especie": "cao",
+    "temperamento": "Calmo e teimoso. Segue cheiro com persistencia e pode ignorar chamados enquanto rastreia.",
+    "porte": "20 a 29 kg, 33 a 38 cm. Corpo longo sobre pernas curtas.",
+    "energia": "Baixa a media. Caminhadas tranquilas; corrida nao combina com a estrutura.",
+    "pelagem": "Curta e densa, repelente a agua.",
+    "cuidados": "Limpeza frequente das orelhas longas, que abafam e retem umidade. Controle de peso: a coluna longa sofre com sobrepeso.",
+    "sinais_distintivos": "Orelhas muito longas, pele solta com rugas, olhar caido, pernas curtas."
+  },
+  "Beagle": {
+    "especie": "cao",
+    "temperamento": "Sociavel e vocal. Late e uiva mais que a media. Guiado pelo olfato.",
+    "porte": "9 a 14 kg, 33 a 41 cm.",
+    "energia": "Alta. Precisa de passeios longos e jogos de faro.",
+    "pelagem": "Curta e dura, geralmente tricolor.",
+    "cuidados": "Escovacao semanal, limpeza de orelhas. Tende a ganhar peso com facilidade.",
+    "sinais_distintivos": "Orelhas longas e arredondadas, focinho quadrado, ponta da cauda frequentemente branca."
+  },
+  "Bengal": {
+    "especie": "gato",
+    "temperamento": "Muito ativo e brincalhao. Muitos gostam de agua, o que e incomum entre gatos.",
+    "porte": "4 a 7 kg.",
+    "energia": "Muito alta. Sem estimulo, desmonta a casa.",
+    "pelagem": "Curta, densa e de brilho incomum, com rosetas ou manchas.",
+    "cuidados": "Escovacao semanal. Precisa de ambiente enriquecido e brinquedos que exijam caca.",
+    "sinais_distintivos": "Manchas em roseta com contorno mais escuro que o centro, pelo lustroso. Confunde-se com o Egyptian Mau, cujas manchas sao solidas, nao em roseta."
+  },
+  "Birman": {
+    "especie": "gato",
+    "temperamento": "Tranquilo e companheiro. Tolera bem criancas e outros animais.",
+    "porte": "4 a 6 kg.",
+    "energia": "Media a baixa.",
+    "pelagem": "Semilonga e sedosa, com pouca subpelagem, o que reduz a formacao de nos.",
+    "cuidados": "Escovacao duas vezes por semana.",
+    "sinais_distintivos": "Extremidades escuras com olhos azuis e, caracteristica da raca, as quatro patas brancas como se usasse luvas."
+  },
+  "Bombay": {
+    "especie": "gato",
+    "temperamento": "Apegado e comunicativo. Procura colo e companhia.",
+    "porte": "3 a 5 kg.",
+    "energia": "Media.",
+    "pelagem": "Curta, muito rente e lustrosa, preta ate a raiz.",
+    "cuidados": "Escovacao semanal. Pouca manutencao.",
+    "sinais_distintivos": "Preto uniforme sem nenhuma marca, com olhos cobre ou dourados que contrastam fortemente."
+  },
+  "Boxer": {
+    "especie": "cao",
+    "temperamento": "Brincalhao e exuberante. Mantem comportamento de filhote por varios anos.",
+    "porte": "25 a 32 kg, 53 a 63 cm.",
+    "energia": "Alta. Precisa de exercicio diario e de companhia.",
+    "pelagem": "Curta e justa ao corpo.",
+    "cuidados": "Escovacao semanal. Focinho curto exige cuidado com calor e esforco intenso.",
+    "sinais_distintivos": "Focinho curto e achatado com mandibula inferior levemente a frente, peito largo, geralmente tigrado ou fulvo com mascara escura."
+  },
+  "British Shorthair": {
+    "especie": "gato",
+    "temperamento": "Calmo e reservado. Gosta de companhia, mas nao costuma ser gato de colo.",
+    "porte": "4 a 8 kg.",
+    "energia": "Baixa. Tende ao sedentarismo e ao sobrepeso.",
+    "pelagem": "Curta, muito densa e de textura firme.",
+    "cuidados": "Escovacao semanal, mais frequente na troca de pelo. Controle de racao.",
+    "sinais_distintivos": "Rosto redondo com bochechas cheias, corpo robusto. Confunde-se com o Russian Blue, que e mais esguio e tem pelo com brilho prateado."
+  },
+  "Chihuahua": {
+    "especie": "cao",
+    "temperamento": "Alerta e apegado a uma pessoa em especial. Desconfia de estranhos.",
+    "porte": "1,5 a 3 kg, 15 a 23 cm.",
+    "energia": "Media. Passeios curtos bastam.",
+    "pelagem": "Existe em pelo curto e pelo longo.",
+    "cuidados": "Atencao aos dentes, que acumulam tartaro com facilidade. Sente frio e costuma precisar de roupa.",
+    "sinais_distintivos": "Cabeca arredondada, orelhas grandes e eretas, olhos proeminentes, porte muito pequeno."
+  },
+  "Egyptian Mau": {
+    "especie": "gato",
+    "temperamento": "Reservado com estranhos e muito ligado ao tutor. Sensivel a mudancas de rotina.",
+    "porte": "3 a 5 kg.",
+    "energia": "Alta. E o gato domestico mais rapido em corrida curta.",
+    "pelagem": "Curta e sedosa, com manchas que aparecem na pele, nao so no pelo.",
+    "cuidados": "Escovacao semanal. Ambiente previsivel reduz estresse.",
+    "sinais_distintivos": "Manchas solidas distribuidas de forma irregular, marca em M na testa, olhos verde-groselha. Confunde-se com o Bengal, que tem rosetas."
+  },
+  "English Cocker Spaniel": {
+    "especie": "cao",
+    "temperamento": "Alegre e apegado. Gosta de trabalhar com o tutor.",
+    "porte": "12 a 15 kg, 38 a 43 cm.",
+    "energia": "Media a alta. Passeios diarios e jogos de busca.",
+    "pelagem": "Media, sedosa, com franjas nas orelhas, peito e patas.",
+    "cuidados": "Escovacao a cada dois dias e tosa periodica. Limpeza frequente das orelhas: sao a queixa mais comum da raca.",
+    "sinais_distintivos": "Orelhas longas e cobertas de pelo ondulado, expressao suave, cauda em movimento constante."
+  },
+  "English Setter": {
+    "especie": "cao",
+    "temperamento": "Gentil e sociavel. Boa convivencia com criancas.",
+    "porte": "20 a 36 kg, 58 a 69 cm.",
+    "energia": "Alta. Foi criado para trabalhar em campo o dia todo.",
+    "pelagem": "Media e lisa, com franjas, no padrao belton: pontinhos de cor sobre fundo branco.",
+    "cuidados": "Escovacao duas a tres vezes por semana para evitar nos nas franjas.",
+    "sinais_distintivos": "Salpicado belton caracteristico, orelhas longas e baixas, corpo alongado e elegante."
+  },
+  "German Shorthaired": {
+    "especie": "cao",
+    "temperamento": "Inteligente e incansavel. Precisa de trabalho; sem ele, fica destrutivo.",
+    "porte": "20 a 32 kg, 53 a 64 cm.",
+    "energia": "Muito alta. E das racas que mais exigem exercicio.",
+    "pelagem": "Curta e dura, repelente a agua.",
+    "cuidados": "Escovacao semanal. O desafio e o gasto de energia, nao o pelo.",
+    "sinais_distintivos": "Pelagem marrom-figado com respingos ou roan, focinho longo, orelhas caidas, corpo atletico."
+  },
+  "Great Pyrenees": {
+    "especie": "cao",
+    "temperamento": "Calmo e independente. Criado para guardar rebanhos sozinho, decide por conta propria.",
+    "porte": "39 a 73 kg, 65 a 82 cm.",
+    "energia": "Baixa a media, apesar do tamanho. Caminhadas moderadas.",
+    "pelagem": "Dupla, longa e densa, branca ou branca com marcas claras.",
+    "cuidados": "Escovacao duas vezes por semana, diaria na troca. Late a noite por instinto de guarda.",
+    "sinais_distintivos": "Porte grande e branco, juba densa no pescoco, esporoes duplos nas patas traseiras. Confunde-se com o Samoyed, que e bem menor e tem cauda enrolada sobre o dorso."
+  },
+  "Havanese": {
+    "especie": "cao",
+    "temperamento": "Sociavel e apegado. Nao lida bem com longos periodos sozinho.",
+    "porte": "3 a 6 kg, 23 a 29 cm.",
+    "energia": "Media. Brincadeiras curtas e passeios leves.",
+    "pelagem": "Longa, leve e ondulada, de dupla camada.",
+    "cuidados": "Escovacao quase diaria. Muitos tutores optam por tosa curta.",
+    "sinais_distintivos": "Pelo longo que cai sobre os olhos, cauda curvada sobre o dorso, porte pequeno."
+  },
+  "Japanese Chin": {
+    "especie": "cao",
+    "temperamento": "Discreto e observador. Comportamento as vezes descrito como felino: sobe em moveis e se equilibra em lugares altos.",
+    "porte": "1,5 a 5 kg, 20 a 27 cm.",
+    "energia": "Baixa. Passeios curtos.",
+    "pelagem": "Longa e sedosa, de camada unica, com franjas nas orelhas e cauda.",
+    "cuidados": "Escovacao duas vezes por semana. Focinho achatado exige cuidado com calor.",
+    "sinais_distintivos": "Rosto achatado com olhos grandes e bem separados, pelagem preta e branca ou vermelha e branca, cauda em plumacao."
+  },
+  "Keeshond": {
+    "especie": "cao",
+    "temperamento": "Amigavel e comunicativo. Late para avisar, nao para intimidar.",
+    "porte": "14 a 20 kg, 43 a 46 cm.",
+    "energia": "Media. Caminhadas diarias.",
+    "pelagem": "Dupla e muito densa, cinza com pontas pretas.",
+    "cuidados": "Escovacao duas vezes por semana, diaria na troca de pelo, que e intensa. Nunca raspar: a camada dupla protege do calor.",
+    "sinais_distintivos": "Oculos: marcas claras ao redor dos olhos que lembram armacao. Juba espessa, cauda enrolada sobre o dorso."
+  },
+  "Leonberger": {
+    "especie": "cao",
+    "temperamento": "Tranquilo e equilibrado. Apesar do tamanho, costuma ser suave com criancas.",
+    "porte": "41 a 77 kg, 65 a 80 cm.",
+    "energia": "Media. Caminhadas e natacao.",
+    "pelagem": "Longa, dupla e resistente a agua, com juba marcada nos machos.",
+    "cuidados": "Escovacao duas a tres vezes por semana. Expectativa de vida curta, em torno de 7 a 9 anos.",
+    "sinais_distintivos": "Porte muito grande, mascara facial escura, juba volumosa, patas com membrana entre os dedos."
+  },
+  "Maine Coon": {
+    "especie": "gato",
+    "temperamento": "Sociavel e tranquilo. Vocaliza com trinados em vez de miados.",
+    "porte": "5 a 11 kg. Um dos maiores gatos domesticos.",
+    "energia": "Media. Gosta de brincar mesmo adulto.",
+    "pelagem": "Semilonga, mais curta nos ombros e longa no ventre e nas pernas traseiras.",
+    "cuidados": "Escovacao duas a tres vezes por semana. Atencao a cardiomiopatia hipertrofica, comum na raca.",
+    "sinais_distintivos": "Tufos nas pontas das orelhas, cauda muito longa e peluda, patas grandes, porte avantajado."
+  },
+  "Miniature Pinscher": {
+    "especie": "cao",
+    "temperamento": "Destemido e curioso para o tamanho que tem. Investiga tudo e foge por qualquer fresta.",
+    "porte": "3,5 a 5 kg, 25 a 32 cm.",
+    "energia": "Alta. Precisa de passeio diario apesar do porte.",
+    "pelagem": "Muito curta e lisa.",
+    "cuidados": "Escovacao ocasional. Sente frio. Ambiente precisa ser a prova de fuga.",
+    "sinais_distintivos": "Andar elevado, levantando bem as patas dianteiras. Corpo compacto, preto e castanho ou vermelho."
+  },
+  "Newfoundland": {
+    "especie": "cao",
+    "temperamento": "Paciente e docil. Historicamente usado em resgate aquatico.",
+    "porte": "45 a 68 kg, 63 a 74 cm.",
+    "energia": "Baixa a media. Natacao e caminhadas moderadas.",
+    "pelagem": "Dupla, longa e oleosa, impermeavel.",
+    "cuidados": "Escovacao duas a tres vezes por semana. Saliva bastante. Sofre com calor.",
+    "sinais_distintivos": "Porte muito grande, geralmente preto, cabeca macica, patas com membrana entre os dedos."
+  },
+  "Persian": {
+    "especie": "gato",
+    "temperamento": "Calmo e caseiro. Prefere ambientes previsiveis e silenciosos.",
+    "porte": "3 a 6 kg.",
+    "energia": "Baixa.",
+    "pelagem": "Longa e densa, com subpelagem farta.",
+    "cuidados": "Escovacao diaria, sem excecao: o pelo embola em dias. Limpeza dos olhos, que lacrimejam pelo formato do rosto.",
+    "sinais_distintivos": "Rosto achatado, nariz curto e respingado, olhos grandes e redondos, pelagem volumosa."
+  },
+  "Pomeranian": {
+    "especie": "cao",
+    "temperamento": "Alerta e vocal. Late para avisar de tudo.",
+    "porte": "1,5 a 3,5 kg, 18 a 25 cm.",
+    "energia": "Media. Passeios curtos.",
+    "pelagem": "Dupla, com pelo externo longo e eriçado que da aspecto arredondado.",
+    "cuidados": "Escovacao duas vezes por semana. Nao raspar: o pelo pode nao voltar igual. Cuidado com os dentes.",
+    "sinais_distintivos": "Formato de bola de pelo, juba no pescoco, cauda em leque sobre o dorso, focinho de raposa."
+  },
+  "Pug": {
+    "especie": "cao",
+    "temperamento": "Sociavel e apegado. Quer estar junto o tempo todo.",
+    "porte": "6 a 8 kg, 25 a 33 cm.",
+    "energia": "Baixa. Passeios curtos em horario fresco.",
+    "pelagem": "Curta e lisa. Solta bastante pelo.",
+    "cuidados": "Limpeza das dobras do rosto para evitar dermatite. Focinho achatado: evitar calor e esforco. Controle rigoroso de peso.",
+    "sinais_distintivos": "Rosto achatado com rugas profundas, olhos grandes e salientes, cauda enrolada, mascara escura."
+  },
+  "Ragdoll": {
+    "especie": "gato",
+    "temperamento": "Muito docil. Tende a relaxar o corpo quando pego no colo, o que deu nome a raca.",
+    "porte": "4 a 9 kg.",
+    "energia": "Baixa a media.",
+    "pelagem": "Semilonga e sedosa, com pouca subpelagem.",
+    "cuidados": "Escovacao duas vezes por semana. Por ser confiante demais, nao deve ter acesso livre a rua.",
+    "sinais_distintivos": "Olhos azuis, extremidades mais escuras, porte grande, corpo que amolece no colo."
+  },
+  "Russian Blue": {
+    "especie": "gato",
+    "temperamento": "Reservado e rotineiro. Some quando chegam visitas, mas e apegado a familia.",
+    "porte": "3 a 5,5 kg.",
+    "energia": "Media.",
+    "pelagem": "Curta, densa e dupla, cinza-azulada com pontas prateadas.",
+    "cuidados": "Escovacao semanal. Preserve a rotina: mudancas incomodam.",
+    "sinais_distintivos": "Cinza uniforme com brilho prateado, olhos verdes vivos, corpo esguio. Confunde-se com o British Shorthair, que e mais robusto e tem olhos cobre."
+  },
+  "Saint Bernard": {
+    "especie": "cao",
+    "temperamento": "Calmo e tolerante. Lento para se irritar.",
+    "porte": "59 a 82 kg, 65 a 90 cm.",
+    "energia": "Baixa. Caminhadas curtas; filhotes nao devem fazer esforco por causa do crescimento rapido.",
+    "pelagem": "Existe em pelo curto e pelo longo, sempre densa.",
+    "cuidados": "Escovacao duas a tres vezes por semana. Saliva muito. Sofre bastante com calor.",
+    "sinais_distintivos": "Porte muito grande, cabeca larga com testa enrugada, mascara branca e vermelha, olhos com palpebra caida."
+  },
+  "Samoyed": {
+    "especie": "cao",
+    "temperamento": "Sociavel e falante. Nao suporta ficar sozinho por muito tempo.",
+    "porte": "16 a 30 kg, 48 a 60 cm.",
+    "energia": "Alta. Precisa de atividade diaria.",
+    "pelagem": "Dupla e densa, branca, feita para frio extremo.",
+    "cuidados": "Escovacao a cada dois dias, diaria na troca, que e volumosa. Nunca raspar.",
+    "sinais_distintivos": "Branco total, cauda enrolada sobre o dorso, cantos da boca levemente erguidos, o chamado sorriso. Confunde-se com o Great Pyrenees, que e bem maior e tem cauda baixa."
+  },
+  "Scottish Terrier": {
+    "especie": "cao",
+    "temperamento": "Independente e determinado. Tem opiniao propria e cava.",
+    "porte": "8,5 a 10 kg, 25 a 28 cm.",
+    "energia": "Media. Passeios diarios.",
+    "pelagem": "Dupla, com pelo externo duro e barba longa.",
+    "cuidados": "Escovacao duas vezes por semana e trimming periodico. Limpar a barba depois das refeicoes.",
+    "sinais_distintivos": "Silhueta retangular e baixa, barba e sobrancelhas fartas, orelhas eretas e pontudas, geralmente preto."
+  },
+  "Shiba Inu": {
+    "especie": "cao",
+    "temperamento": "Independente e limpo. Comportamento proximo ao de um gato. Difícil de chamar de volta sem treino.",
+    "porte": "7 a 11 kg, 34 a 42 cm.",
+    "energia": "Media a alta. Passeios diarios, sempre na guia.",
+    "pelagem": "Dupla, curta e dura.",
+    "cuidados": "Escovacao semanal, diaria na troca, que e intensa duas vezes por ano.",
+    "sinais_distintivos": "Cauda grossa enrolada sobre o dorso, orelhas pequenas e eretas, marcas creme no focinho, peito e ventre."
+  },
+  "Siamese": {
+    "especie": "gato",
+    "temperamento": "Muito vocal e exigente de atencao. Conversa com o tutor o dia inteiro.",
+    "porte": "2,5 a 5,5 kg.",
+    "energia": "Alta.",
+    "pelagem": "Curta, fina e rente, sem subpelagem.",
+    "cuidados": "Escovacao ocasional. Precisa de companhia: nao lida bem com solidao.",
+    "sinais_distintivos": "Extremidades escuras contra corpo claro, olhos azuis amendoados, cabeca triangular, corpo esguio."
+  },
+  "Sphynx": {
+    "especie": "gato",
+    "temperamento": "Extrovertido e apegado. Procura calor humano o tempo todo.",
+    "porte": "3 a 5 kg.",
+    "energia": "Alta.",
+    "pelagem": "Sem pelo visivel; a pele tem textura de camurça e e quente ao toque.",
+    "cuidados": "Banho ou limpeza semanal, porque a oleosidade da pele nao e absorvida por pelo. Protecao do frio e do sol. Limpeza das orelhas, que acumulam cera.",
+    "sinais_distintivos": "Ausencia de pelo, pele enrugada, orelhas muito grandes, barriga em formato de pera."
+  },
+  "Staffordshire Bull Terrier": {
+    "especie": "cao",
+    "temperamento": "Afetuoso e brincalhao, muito ligado a pessoas. Precisa de socializacao com outros caes.",
+    "porte": "11 a 17 kg, 36 a 41 cm.",
+    "energia": "Alta. Exercicio diario e jogos de mordida apropriados.",
+    "pelagem": "Curta, lisa e justa.",
+    "cuidados": "Escovacao semanal. Controle de peso.",
+    "sinais_distintivos": "Corpo baixo e muito musculoso, cabeca larga com bochechas marcadas. Confunde-se com o American Pit Bull Terrier, que e mais alto e de linhas mais longas."
+  },
+  "Wheaten Terrier": {
+    "especie": "cao",
+    "temperamento": "Alegre e efusivo. Costuma pular para cumprimentar; precisa de treino para nao fazer isso.",
+    "porte": "14 a 18 kg, 43 a 48 cm.",
+    "energia": "Alta. Passeios longos e brincadeiras.",
+    "pelagem": "Unica camada, macia, ondulada e cor de trigo. Solta pouco pelo.",
+    "cuidados": "Escovacao quase diaria: o pelo macio embola com facilidade. Tosa periodica.",
+    "sinais_distintivos": "Pelo cor de trigo caindo sobre os olhos, silhueta quadrada, movimento saltitante."
+  },
+  "Yorkshire Terrier": {
+    "especie": "cao",
+    "temperamento": "Alerta e corajoso para o tamanho. Late bastante e se apega a uma pessoa.",
+    "porte": "2 a 3,2 kg, 18 a 23 cm.",
+    "energia": "Media. Passeios curtos.",
+    "pelagem": "Longa, lisa e fina, de textura parecida com cabelo humano. Solta muito pouco pelo.",
+    "cuidados": "Escovacao diaria se o pelo for mantido longo; muitos tutores preferem tosa curta. Atencao aos dentes e a traqueia, que e fragil: usar peitoral em vez de coleira.",
+    "sinais_distintivos": "Pelo longo azul-aco e dourado repartido ao meio, porte muito pequeno, orelhas pequenas e eretas."
+  }
+}

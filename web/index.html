@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pet Detetive</title>
+<style>
+  /* Sem framework, por decisao do CLAUDE.md: o fluxo e pequeno e numa bancada
+     depurar codigo proprio e mais rapido. Tema escuro e tipografia grande
+     porque a tela vai ser lida de pe, a uns dois metros. */
+  :root {
+    --fundo: #0f1115;
+    --painel: #171a21;
+    --borda: #262b36;
+    --texto: #e8eaf0;
+    --fraco: #949cab;
+    --destaque: #5eead4;
+    --alerta: #fbbf24;
+    --duvida: #a78bfa;
+    --nuvem: #60a5fa;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--fundo); color: var(--texto);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .envoltorio { max-width: 1100px; margin: 0 auto; padding: 24px 20px 48px; }
+
+  header { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+           border-bottom: 1px solid var(--borda); padding-bottom: 16px; }
+  h1 { font-size: 30px; margin: 0; letter-spacing: -0.4px; }
+  .subtitulo { color: var(--fraco); font-size: 14px; }
+  .estado { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  .pastilha { font-size: 12px; padding: 3px 9px; border-radius: 999px;
+              border: 1px solid var(--borda); color: var(--fraco); }
+  .pastilha.ok { color: var(--destaque); border-color: #1e5d54; }
+  .pastilha.off { color: var(--alerta); border-color: #6b4e13; }
+
+  .envio { display: flex; gap: 12px; flex-wrap: wrap; margin: 24px 0 8px; }
+  .botao {
+    appearance: none; border: 1px solid var(--borda); background: var(--painel);
+    color: var(--texto); font-size: 15px; font-weight: 600; padding: 13px 22px;
+    border-radius: 10px; cursor: pointer;
+  }
+  .botao:hover { border-color: #3a4152; }
+  .botao.principal { background: var(--destaque); color: #06231f; border-color: transparent; }
+  .botao:disabled { opacity: .45; cursor: default; }
+  input[type=file] { display: none; }
+
+  .aviso { color: var(--alerta); font-size: 14px; min-height: 20px; margin-top: 4px; }
+
+  .quadros { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; }
+  @media (max-width: 720px) { .quadros { grid-template-columns: 1fr; } }
+  .quadro { background: var(--painel); border: 1px solid var(--borda);
+            border-radius: 12px; overflow: hidden; }
+  .quadro h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .09em;
+               color: var(--fraco); margin: 0; padding: 11px 14px;
+               border-bottom: 1px solid var(--borda); font-weight: 600; }
+  .quadro img { display: block; width: 100%; aspect-ratio: 1; object-fit: contain;
+                background: #0a0c10; }
+
+  .cartao { background: var(--painel); border: 1px solid var(--borda);
+            border-radius: 12px; padding: 18px; margin-top: 16px; }
+
+  .decisao { display: inline-block; font-size: 12px; font-weight: 700;
+             text-transform: uppercase; letter-spacing: .08em;
+             padding: 4px 11px; border-radius: 6px; }
+  .decisao.afirmar  { background: #0d3b34; color: var(--destaque); }
+  .decisao.comparar { background: #40320c; color: var(--alerta); }
+  .decisao.perguntar{ background: #2f2454; color: var(--duvida); }
+
+  .mensagem { font-size: 19px; line-height: 1.45; margin: 12px 0 4px; }
+
+  .barra { margin-top: 13px; }
+  .barra-topo { display: flex; justify-content: space-between; align-items: baseline;
+                font-size: 15px; margin-bottom: 5px; }
+  .barra-topo b { font-weight: 600; }
+  .barra-topo span { font-variant-numeric: tabular-nums; color: var(--fraco); }
+  .trilho { height: 10px; background: #0a0c10; border-radius: 999px; overflow: hidden; }
+  .preenchimento { height: 100%; background: var(--destaque); border-radius: 999px;
+                   transition: width .35s ease; }
+  .barra:nth-child(2) .preenchimento { background: #3f8f86; }
+  .barra:nth-child(3) .preenchimento { background: #2d5f5a; }
+
+  .refino { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--borda); }
+  .pergunta { font-size: 17px; color: var(--duvida); margin-bottom: 10px; }
+  .linha { display: flex; gap: 10px; flex-wrap: wrap; }
+  input[type=text] {
+    flex: 1; min-width: 220px; background: #0a0c10; border: 1px solid var(--borda);
+    color: var(--texto); border-radius: 9px; padding: 12px 14px; font-size: 15px;
+  }
+  input[type=text]:focus { outline: none; border-color: var(--duvida); }
+
+  .perfil { white-space: pre-wrap; line-height: 1.65; }
+  .rotulo-rota { font-size: 12px; color: var(--fraco); margin-top: 12px; }
+  .rotulo-rota b.local { color: var(--destaque); }
+  .rotulo-rota b.nuvem { color: var(--nuvem); }
+  .rotulo-rota b.base  { color: var(--alerta); }
+
+  .galeria { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  .galeria img { width: 78px; height: 78px; object-fit: cover; border-radius: 9px;
+                 border: 2px solid var(--borda); cursor: pointer; }
+  .galeria img:hover { border-color: var(--destaque); }
+
+  footer { margin-top: 34px; border-top: 1px solid var(--borda); padding-top: 18px; }
+  .grade-metricas { display: grid; gap: 14px;
+                    grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); }
+  .metrica { background: var(--painel); border: 1px solid var(--borda);
+             border-radius: 10px; padding: 13px 15px; }
+  .metrica .valor { font-size: 25px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .metrica .nome { font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
+                   color: var(--fraco); margin-top: 3px; }
+  .metrica.destaque .valor { color: var(--destaque); }
+
+  .nota { color: var(--fraco); font-size: 13px; margin-top: 16px; line-height: 1.6; }
+  .escondido { display: none; }
+  .girando { opacity: .55; }
+</style>
+</head>
+<body>
+<div class="envoltorio">
+
+  <header>
+    <h1>Pet Detetive</h1>
+    <span class="subtitulo">com quais raças o seu pet mais se parece</span>
+    <div class="estado" id="estado"></div>
+  </header>
+
+  <div class="envio">
+    <label class="botao principal" for="arquivo">Escolher uma foto</label>
+    <input type="file" id="arquivo" accept="image/*">
+    <label class="botao" for="camera">Tirar foto agora</label>
+    <input type="file" id="camera" accept="image/*" capture="environment">
+  </div>
+  <div class="aviso" id="aviso"></div>
+
+  <div id="galeria-bloco" class="escondido">
+    <div class="nota">Sem um pet por perto? Use uma destas:</div>
+    <div class="galeria" id="galeria"></div>
+  </div>
+
+  <div id="resultado" class="escondido">
+    <div class="quadros">
+      <div class="quadro">
+        <h2>a foto</h2>
+        <img id="foto" alt="foto enviada">
+      </div>
+      <div class="quadro">
+        <h2>onde a rede olhou — Grad-CAM</h2>
+        <img id="mapa" alt="mapa de atenção">
+      </div>
+    </div>
+
+    <div class="cartao">
+      <span class="decisao" id="decisao"></span>
+      <p class="mensagem" id="mensagem"></p>
+      <div id="barras"></div>
+
+      <div class="refino escondido" id="refino">
+        <div class="pergunta" id="pergunta"></div>
+        <form class="linha" id="forma-refino">
+          <input type="text" id="texto-refino" autocomplete="off"
+                 placeholder="responda com suas palavras…">
+          <button class="botao" type="submit">Enviar</button>
+        </form>
+      </div>
+
+      <div class="rotulo-rota" id="latencias"></div>
+    </div>
+
+    <div class="cartao">
+      <div class="linha" style="justify-content: space-between; align-items: center;">
+        <strong id="titulo-perfil">Perfil da raça</strong>
+        <button class="botao" id="botao-perfil">Ver o perfil</button>
+      </div>
+      <div class="perfil" id="perfil" style="margin-top: 12px;"></div>
+      <div class="rotulo-rota" id="rota-perfil"></div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="grade-metricas" id="metricas"></div>
+    <p class="nota">
+      A rede compara a foto com 37 raças puras e mede <strong>semelhança visual</strong>,
+      não ascendência genética. A sua foto não sai desta máquina: ela é processada em
+      memória, nunca é gravada em disco e nunca é enviada para a nuvem. Só o nome da raça
+      e o texto da base de conhecimento local são usados para escrever o perfil.
+    </p>
+  </footer>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let sessao = null, racaTopo = null;
+
+const pct = (x) => (x * 100).toFixed(1) + '%';
+
+async function carregarSaude() {
+  try {
+    const s = await (await fetch('/saude')).json();
+    $('estado').innerHTML = [
+      `<span class="pastilha ok">${s.modelo} · ${s.dispositivo}</span>`,
+      `<span class="pastilha ${s.slm_disponivel ? 'ok' : 'off'}">SLM ${s.slm_disponivel ? 'local' : 'fora'}</span>`,
+      `<span class="pastilha ${s.nuvem_disponivel ? 'ok' : 'off'}">nuvem ${s.nuvem_disponivel ? 'ok' : 'sem chave'}</span>`,
+      `<span class="pastilha">RAG ${s.rag}</span>`,
+    ].join('');
+  } catch { $('estado').innerHTML = '<span class="pastilha off">API fora</span>'; }
+}
+
+async function carregarExemplos() {
+  try {
+    const { exemplos } = await (await fetch('/exemplos')).json();
+    if (!exemplos.length) return;            // galeria some sozinha se vazia
+    $('galeria-bloco').classList.remove('escondido');
+    $('galeria').innerHTML = exemplos
+      .map((u) => `<img src="${u}" alt="exemplo" data-url="${u}">`).join('');
+    $('galeria').querySelectorAll('img').forEach((img) => {
+      img.onclick = async () => {
+        const blob = await (await fetch(img.dataset.url)).blob();
+        enviar(new File([blob], 'exemplo.jpg', { type: blob.type }));
+      };
+    });
+  } catch {}
+}
+
+async function carregarMetricas() {
+  try {
+    const m = await (await fetch('/metricas')).json();
+    const caixa = (v, n, d) =>
+      `<div class="metrica ${d ? 'destaque' : ''}"><div class="valor">${v}</div><div class="nome">${n}</div></div>`;
+    $('metricas').innerHTML = [
+      caixa(m.fotos, 'fotos classificadas'),
+      caixa(m.percentual_local + '%', 'resolvido localmente', true),
+      caixa(m.percepcao_ms.toFixed(0) + ' ms', 'percepção'),
+      caixa(m.gradcam_ms.toFixed(0) + ' ms', 'grad-cam'),
+      caixa((m.por_rota.local?.latencia_media_ms ?? 0).toFixed(0) + ' ms', 'linguagem local'),
+      caixa((m.por_rota.nuvem?.latencia_media_ms ?? 0).toFixed(0) + ' ms', 'linguagem nuvem'),
+    ].join('');
+  } catch {}
+}
+
+function desenhar(r) {
+  $('resultado').classList.remove('escondido');
+  $('mapa').src = r.mapa_atencao;
+  $('decisao').textContent = r.decisao;
+  $('decisao').className = 'decisao ' + r.decisao;
+  $('mensagem').textContent = r.mensagem;
+
+  $('barras').innerHTML = r.palpites.map((p) => `
+    <div class="barra">
+      <div class="barra-topo"><b>${p.raca}</b><span>${pct(p.probabilidade)}</span></div>
+      <div class="trilho"><div class="preenchimento" style="width:${p.probabilidade * 100}%"></div></div>
+    </div>`).join('');
+
+  racaTopo = r.palpites[0].raca;
+  $('titulo-perfil').textContent = 'Perfil de ' + racaTopo;
+  $('perfil').textContent = '';
+  $('rota-perfil').textContent = '';
+  $('botao-perfil').disabled = false;
+
+  // A caixa de refinamento só aparece quando o agente decidiu perguntar.
+  if (r.decisao === 'perguntar' && r.pergunta) {
+    $('refino').classList.remove('escondido');
+    $('pergunta').textContent = r.pergunta;
+    $('texto-refino').value = '';
+  } else {
+    $('refino').classList.add('escondido');
+  }
+
+  const l = r.latencia_ms || {};
+  $('latencias').innerHTML =
+    `percepção <b>${l.percepcao ?? '—'} ms</b> · grad-cam <b>${l.gradcam ?? '—'} ms</b> · ` +
+    `linguagem <b>${l.linguagem ?? '—'} ms</b> pela rota <b class="${r.rota_linguagem}">${r.rota_linguagem}</b>`;
+
+  carregarMetricas();
+}
+
+async function enviar(arquivo) {
+  $('aviso').textContent = '';
+  $('foto').src = URL.createObjectURL(arquivo);
+  $('resultado').classList.add('girando');
+
+  const dados = new FormData();
+  dados.append('foto', arquivo);
+  const url = '/classificar' + (sessao ? '?sessao=' + encodeURIComponent(sessao) : '');
+
+  try {
+    const resp = await fetch(url, { method: 'POST', body: dados });
+    if (!resp.ok) {
+      const e = await resp.json().catch(() => ({}));
+      throw new Error(e.detail || 'falha ao classificar');
+    }
+    const r = await resp.json();
+    sessao = r.sessao;
+    desenhar(r);
+  } catch (e) {
+    $('aviso').textContent = e.message;
+  } finally {
+    $('resultado').classList.remove('girando');
+  }
+}
+
+$('arquivo').onchange = (e) => e.target.files[0] && enviar(e.target.files[0]);
+$('camera').onchange  = (e) => e.target.files[0] && enviar(e.target.files[0]);
+
+$('forma-refino').onsubmit = async (e) => {
+  e.preventDefault();
+  const texto = $('texto-refino').value.trim();
+  if (!texto) return;
+  $('refino').classList.add('girando');
+  try {
+    const r = await (await fetch('/responder', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessao, texto }),
+    })).json();
+    desenhar({ ...r, mapa_atencao: $('mapa').src });
+    if (r.entendido) {
+      $('aviso').textContent =
+        `entendi: ${r.entendido.campo} = ${r.entendido.valor} — reordenei os palpites`;
+    }
+  } catch { $('aviso').textContent = 'não consegui processar a resposta'; }
+  finally { $('refino').classList.remove('girando'); }
+};
+
+$('botao-perfil').onclick = async () => {
+  $('botao-perfil').disabled = true;
+  $('perfil').textContent = 'escrevendo…';
+  try {
+    const r = await (await fetch('/perfil', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessao, raca: racaTopo }),
+    })).json();
+    $('perfil').textContent = r.texto;
+    $('rota-perfil').innerHTML =
+      `escrito pela rota <b class="${r.rota}">${r.rota}</b> em ${r.latencia_ms} ms · ` +
+      `ancorado em <b>${r.fonte}</b>`;
+    carregarMetricas();
+  } catch {
+    $('perfil').textContent = 'não consegui montar o perfil agora.';
+  } finally { $('botao-perfil').disabled = false; }
+};
+
+carregarSaude();
+carregarExemplos();
+carregarMetricas();
+setInterval(carregarMetricas, 8000);
+</script>
+</body>
+</html>

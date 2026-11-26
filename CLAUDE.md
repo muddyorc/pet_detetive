@@ -137,7 +137,58 @@ CONFIANCA_BAIXA = 0.30
 
 ---
 
-## 4. O que falta construir
+## 3b. Etapas 4 e 5 — construídas em 25/11, funcionando
+
+```
+slm.py           cliente do Ollama: gerar() e extrair() com JSON Schema
+rag.py           busca sobre conhecimento/racas.json (TF-IDF, embeddings opcionais)
+llm.py           cliente da nuvem; sem chave cai no SLM local
+roteador.py      decide local/nuvem por tarefa e conta tudo
+agente.py        orquestra, com memória por sessão e reponderação
+api.py           FastAPI, 6 rotas + /exemplos
+web/index.html   interface única, sem framework
+teste_offline.py teste de aceitação da etapa 5
+conhecimento/racas.json   37 raças × 7 campos, validado contra class_names
+```
+
+`python teste_offline.py` passa: sem Ollama e sem nuvem, classificação, mapa,
+decisão e frases curtas continuam; só o perfil longo degrada, com aviso.
+
+**Três decisões que divergem da especificação original, cada uma por medição:**
+
+1. **O RAG usa TF-IDF, não embeddings.** Medimos as duas rotas: o TF-IDF
+   ganhou nas três consultas de teste *e* é 700x mais rápido (3 ms contra
+   2096 ms). O `nomic-embed-text` é treinado sobretudo em inglês, e a base
+   está em português. `rag.USAR_EMBEDDINGS = True` reativa a outra rota. Ter
+   medido e escolhido é um argumento melhor na arguição do que usar embeddings
+   por serem o esperado.
+
+2. **O guardrail da restrição 1 é verificado, não só pedido.**
+   `slm.violou_guardrail()` barra o texto se aparecer "ascendência",
+   "genética", "composição", "DNA", "linhagem" e afins; o roteador então usa
+   um texto de reserva escrito à mão. Isso existe porque aconteceu: o prompt
+   dizia "nunca diga ascendência genética" e o modelo de 3B respondeu
+   *"não conseguiu identificar a ascendência genética"*. Citar a palavra
+   proibida a torna disponível — o prompt agora é só positivo.
+
+3. **O esquema de refinamento usa um enum autodescritivo.** Com `campo` e
+   `valor` separados, "pelo enorme" virava `{"campo":"pelagem","valor":"grande"}`:
+   JSON válido, resposta errada. Com `pelo_longo` / `porte_grande` o erro não é
+   representável. 5 de 5 casos corretos, incluindo recusar com `nao_sei`.
+
+**"Reclassificar" significa reponderar.** A CNN não aceita texto. O campo
+extraído multiplica os pesos das raças que a base descreve daquele jeito e
+renormaliza — a rede continua sendo a única evidência visual, o texto desempata.
+Não descarta candidatas: o visitante pode se enganar sobre o próprio pet.
+
+**O que ainda falta:** a chave da API (o sistema funciona sem ela, com o perfil
+longo pelo SLM local) e a calibração dos limiares em fotos de celular.
+
+---
+
+## 4. Especificação original das etapas 4 e 5
+
+Mantida como referência do que foi pedido.
 
 ### Etapa 4 — API e interface web
 
