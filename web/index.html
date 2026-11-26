@@ -152,22 +152,20 @@
 
   <div class="envio">
     <label class="botao principal" for="arquivo">Escolher uma foto</label>
+    <!-- Sem `capture`: no celular o proprio seletor ja oferece "Tirar foto"
+         no menu, entao um botao so cobre os dois casos. -->
     <input type="file" id="arquivo" accept="image/*">
-    <label class="botao" for="camera">Usar a câmera do celular</label>
-    <input type="file" id="camera" accept="image/*" capture="environment">
-    <button class="botao" id="botao-ligar">Ligar a câmera aqui</button>
+    <button class="botao" id="botao-ligar">Ligar a câmera</button>
   </div>
   <div class="aviso" id="aviso"></div>
 
   <div class="camera escondido" id="bloco-camera">
     <video id="video" playsinline muted class="espelho"></video>
     <canvas id="congelado" class="escondido"></canvas>
-    <div class="guia" id="guia"></div>
+    <div class="guia"></div>
   </div>
   <div class="camera-acoes escondido" id="acoes-camera">
-    <button class="botao principal" id="botao-disparar">Tirar a foto</button>
-    <button class="botao escondido" id="botao-refazer">Tirar outra</button>
-    <button class="botao escondido" id="botao-usar">Usar esta</button>
+    <button class="botao principal" id="botao-disparar">Identificar</button>
     <select id="dispositivos" class="escondido"></select>
     <button class="botao" id="botao-desligar">Desligar</button>
   </div>
@@ -339,7 +337,6 @@ async function enviar(arquivo) {
 }
 
 $('arquivo').onchange = (e) => e.target.files[0] && enviar(e.target.files[0]);
-$('camera').onchange  = (e) => e.target.files[0] && enviar(e.target.files[0]);
 
 /* ------------------------------------------------------------------
    Câmera ao vivo.
@@ -358,20 +355,10 @@ $('camera').onchange  = (e) => e.target.files[0] && enviar(e.target.files[0]);
    2. O pipeline faz CenterCrop(224). Capturamos o maior quadrado central do
       quadro, que é exatamente o que a rede vai ver.
    ------------------------------------------------------------------ */
-let fluxo = null, blobCapturado = null;
+let fluxo = null;
 
 const podeCamera = () =>
   window.isSecureContext && navigator.mediaDevices?.getUserMedia;
-
-function mostrarAcoes(estado) {
-  // 'ao-vivo' = mostrando a câmera; 'congelado' = revisando a foto tirada.
-  $('botao-disparar').classList.toggle('escondido', estado !== 'ao-vivo');
-  $('botao-refazer').classList.toggle('escondido', estado !== 'congelado');
-  $('botao-usar').classList.toggle('escondido', estado !== 'congelado');
-  $('video').classList.toggle('escondido', estado === 'congelado');
-  $('congelado').classList.toggle('escondido', estado !== 'congelado');
-  $('guia').classList.toggle('escondido', estado === 'congelado');
-}
 
 async function listarCameras() {
   try {
@@ -405,7 +392,6 @@ async function ligarCamera(deviceId) {
     $('bloco-camera').classList.remove('escondido');
     $('acoes-camera').classList.remove('escondido');
     $('botao-ligar').classList.add('escondido');
-    mostrarAcoes('ao-vivo');
     listarCameras();                             // os rótulos só vêm após permissão
     $('aviso').textContent = '';
   } catch (e) {
@@ -423,9 +409,17 @@ function desligarCamera() {
   $('botao-ligar').classList.remove('escondido');
 }
 
-function disparar() {
+/* Captura e identifica no mesmo clique.
+
+   Sem etapa de conferência: a câmera continua ao vivo e a foto capturada
+   aparece no resultado, lado a lado com o mapa de atenção. Se saiu tremida,
+   refazer é um clique no mesmo botão — o que dá no mesmo que confirmar, com
+   metade das interações. Numa fila isso importa. */
+function identificar() {
   const v = $('video');
-  // Maior quadrado central do quadro: é o que sobrevive ao CenterCrop.
+  if (!v.videoWidth) { $('aviso').textContent = 'a câmera ainda não iniciou'; return; }
+
+  // Maior quadrado central do quadro: é o que sobrevive ao CenterCrop(224).
   const lado = Math.min(v.videoWidth, v.videoHeight);
   const x = (v.videoWidth - lado) / 2, y = (v.videoHeight - lado) / 2;
 
@@ -433,20 +427,19 @@ function disparar() {
   c.width = c.height = Math.min(lado, 900);      // 900px basta para 224 e sobra
   c.getContext('2d').drawImage(v, x, y, lado, lado, 0, 0, c.width, c.height);
 
-  // Congela antes de enviar: pet se mexe, e a primeira foto costuma sair
-  // tremida. Deixar conferir evita classificar um borrão.
-  c.toBlob((b) => { blobCapturado = b; mostrarAcoes('congelado'); }, 'image/jpeg', 0.92);
+  $('botao-disparar').disabled = true;
+  c.toBlob(async (b) => {
+    try {
+      await enviar(new File([b], 'camera.jpg', { type: 'image/jpeg' }));
+    } finally {
+      $('botao-disparar').disabled = false;      // pronta para o próximo
+    }
+  }, 'image/jpeg', 0.92);
 }
 
 $('botao-ligar').onclick = () => ligarCamera();
 $('botao-desligar').onclick = desligarCamera;
-$('botao-disparar').onclick = disparar;
-$('botao-refazer').onclick = () => { blobCapturado = null; mostrarAcoes('ao-vivo'); };
-$('botao-usar').onclick = () => {
-  if (!blobCapturado) return;
-  enviar(new File([blobCapturado], 'camera.jpg', { type: 'image/jpeg' }));
-  mostrarAcoes('ao-vivo');                       // já pronta para o próximo visitante
-};
+$('botao-disparar').onclick = identificar;
 $('dispositivos').onchange = (e) => ligarCamera(e.target.value);
 
 if (!podeCamera()) {
