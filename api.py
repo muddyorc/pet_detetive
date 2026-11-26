@@ -185,6 +185,33 @@ def exemplo(nome: str):
 
 
 if __name__ == "__main__":
+    import argparse
+    import socket
+
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    ap = argparse.ArgumentParser(description="Sobe a API do Pet Detetive")
+    ap.add_argument("--porta", type=int, default=8000)
+    ap.add_argument("--rede", action="store_true",
+                    help="aceita celulares da mesma rede (escuta em 0.0.0.0)")
+    args = ap.parse_args()
+
+    if args.rede:
+        # Descobre o IP da maquina na rede so para imprimir na tela.
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+        except OSError:
+            ip = "<ip-da-maquina>"
+        finally:
+            s.close()
+        print(f"\nno celular, abra:  http://{ip}:{args.porta}")
+        # A camera ao vivo NAO funciona por IP: getUserMedia exige contexto
+        # seguro (HTTPS ou localhost). Pelo celular o caminho e "Escolher uma
+        # foto", cujo seletor ja oferece a camera no menu do sistema.
+        print("   a camera ao vivo so funciona em localhost; pelo celular use")
+        print("   'Escolher uma foto', que abre a camera pelo menu do sistema")
+        print("   a foto trafega pela rede local, e nunca sai dela\n")
+
+    uvicorn.run(app, host="0.0.0.0" if args.rede else "127.0.0.1", port=args.porta)

@@ -190,12 +190,33 @@ Se o sistema ficar perguntando demais na bancada, suba `CONFIANCA_BAIXA`.
 ## Etapas 4 e 5 — subir o sistema
 
 ```bash
-uvicorn api:app --reload
+uvicorn api:app --reload          # só nesta máquina
+python api.py --rede              # aceita celulares da mesma rede
 ```
 
 E abra `http://localhost:8000`. A API carrega o modelo e o índice uma vez e
 **aquece o SLM na inicialização** — sem isso o primeiro visitante esperaria uns
 75 segundos pela primeira frase. Sobe em cerca de 4 segundos.
+
+### Pelo celular
+
+Com `--rede`, a API imprime o endereço (algo como `http://192.168.0.14:8000`) e
+qualquer celular no mesmo Wi-Fi abre a página. O layout é responsivo.
+
+Mas **a câmera ao vivo não funciona por IP**: o `getUserMedia` exige contexto
+seguro — HTTPS ou `localhost`. É regra do navegador, não configuração. Pelo
+celular o caminho é "Escolher uma foto", e o seletor de arquivo do celular já
+oferece a câmera no próprio menu do sistema. Por isso não existe um botão
+separado de câmera para celular: seria redundante.
+
+| Como você acessa | Escolher uma foto | Ligar a câmera |
+| --- | --- | --- |
+| `localhost` no notebook da bancada | sim | **sim** |
+| IP da rede, pelo celular | sim (abre a câmera pelo menu) | não |
+
+**Não use túnel (ngrok e parecidos) para contornar isso.** Daria HTTPS e
+liberaria a câmera, mas as fotos passariam a trafegar pela internet — o que
+quebra exatamente a tese de privacidade do projeto.
 
 | Rota | O que faz |
 | --- | --- |

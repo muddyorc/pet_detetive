@@ -43,6 +43,18 @@ alguma das três disciplinas, ou torna o projeto indefensável numa arguição.
    de foto. Esse é o argumento central de privacidade do projeto; se a imagem subir
    para a nuvem, a tese cai.
 
+2b. **Precisao de linguagem sobre a restricao 2.** "A foto nunca sai da
+   maquina" vale ao pe da letra quando o visitante usa o notebook da bancada.
+   Se ele acessar do proprio celular (`python api.py --rede`), a foto cruza o
+   Wi-Fi local ate o notebook. Ela continua **nunca tocando a internet**, que
+   e o argumento que importa, mas na arguicao diga "a foto nunca sai da rede
+   local" nesse caso. Afirmar o mais forte e ser pego na diferenca custa mais
+   do que a diferenca vale.
+
+   Pelo mesmo motivo, **nao use tunel** (ngrok e parecidos) para liberar a
+   camera ao vivo no celular: daria HTTPS, mas as fotos passariam a trafegar
+   pela internet, e a tese cai.
+
 3. **As duas redes compartilham o pipeline.** Mesmo split (semente 42), mesmo aumento
    de dados, mesma rotina de avaliação. Só o modelo muda. É isso que torna a
    comparação do banner honesta. Não "otimize" uma das duas separadamente.
