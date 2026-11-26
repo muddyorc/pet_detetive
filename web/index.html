@@ -103,6 +103,11 @@
   .barra:nth-child(2) .preenchimento { background: #3f8f86; }
   .barra:nth-child(3) .preenchimento { background: #2d5f5a; }
 
+  .gabarito { margin-top: 14px; font-size: 14px; padding: 9px 13px;
+              border-radius: 8px; border: 1px solid var(--borda); }
+  .gabarito.certo  { color: var(--destaque); border-color: #1e5d54; }
+  .gabarito.errado { color: var(--alerta);   border-color: #6b4e13; }
+
   .refino { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--borda); }
   .pergunta { font-size: 17px; color: var(--duvida); margin-bottom: 10px; }
   .linha { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -120,11 +125,6 @@
   /* 'reserva' = o SLM caiu e a frase veio do texto fixo. Vale aparecer
      na tela: modo degradado e informacao, nao defeito escondido. */
   .rotulo-rota b.reserva { color: var(--alerta); }
-
-  .galeria { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
-  .galeria img { width: 78px; height: 78px; object-fit: cover; border-radius: 9px;
-                 border: 2px solid var(--borda); cursor: pointer; }
-  .galeria img:hover { border-color: var(--destaque); }
 
   footer { margin-top: 34px; border-top: 1px solid var(--borda); padding-top: 18px; }
   .grade-metricas { display: grid; gap: 14px;
@@ -156,6 +156,10 @@
          no menu, entao um botao so cobre os dois casos. -->
     <input type="file" id="arquivo" accept="image/*">
     <button class="botao" id="botao-ligar">Ligar a câmera</button>
+    <!-- Para visitantes sem pet. Sorteia do banco inteiro (7349 fotos, 37
+         raças) em vez de uma tira fixa de miniaturas: mais variedade, menos
+         tela ocupada, e dá vontade de clicar de novo. -->
+    <button class="botao escondido" id="botao-sortear">Sortear um animal</button>
   </div>
   <div class="aviso" id="aviso"></div>
 
@@ -170,10 +174,6 @@
     <button class="botao" id="botao-desligar">Desligar</button>
   </div>
 
-  <div id="galeria-bloco" class="escondido">
-    <div class="nota">Sem um pet por perto? Use uma destas:</div>
-    <div class="galeria" id="galeria"></div>
-  </div>
 
   <div id="resultado" class="escondido">
     <div class="quadros">
@@ -191,6 +191,8 @@
       <span class="decisao" id="decisao"></span>
       <p class="mensagem" id="mensagem"></p>
       <div id="barras"></div>
+      <!-- Só aparece em foto sorteada, onde a raça verdadeira é conhecida. -->
+      <div class="gabarito escondido" id="gabarito"></div>
 
       <div class="refino escondido" id="refino">
         <div class="pergunta" id="pergunta"></div>
@@ -227,7 +229,7 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
-let sessao = null, racaTopo = null;
+let sessao = null, racaTopo = null, gabarito = null;
 
 const pct = (x) => (x * 100).toFixed(1) + '%';
 
@@ -245,18 +247,32 @@ async function carregarSaude() {
 
 async function carregarExemplos() {
   try {
-    const { exemplos } = await (await fetch('/exemplos')).json();
-    if (!exemplos.length) return;            // galeria some sozinha se vazia
-    $('galeria-bloco').classList.remove('escondido');
-    $('galeria').innerHTML = exemplos
-      .map((u) => `<img src="${u}" alt="exemplo" data-url="${u}">`).join('');
-    $('galeria').querySelectorAll('img').forEach((img) => {
-      img.onclick = async () => {
-        const blob = await (await fetch(img.dataset.url)).blob();
-        enviar(new File([blob], 'exemplo.jpg', { type: blob.type }));
-      };
-    });
+    const { quantidade } = await (await fetch('/exemplos')).json();
+    if (!quantidade) return;                 // sem fotos, o botão nem aparece
+    const b = $('botao-sortear');
+    b.classList.remove('escondido');
+    b.title = `${quantidade.toLocaleString('pt-BR')} fotos no banco`;
   } catch {}
+}
+
+/* Sorteia uma foto do banco e já identifica. O servidor embaralha e consome,
+   então não repete a mesma foto em seguida. */
+async function sortear() {
+  const b = $('botao-sortear');
+  b.disabled = true;
+  try {
+    const resp = await fetch('/exemplos/aleatorio');
+    if (!resp.ok) throw new Error('não consegui sortear');
+    // O servidor manda o gabarito no cabeçalho: o nome do arquivo do
+    // Oxford-IIIT Pet carrega a raça verdadeira.
+    gabarito = resp.headers.get('X-Raca-Verdadeira');
+    const blob = await resp.blob();
+    await enviar(new File([blob], 'sorteio.jpg', { type: blob.type || 'image/jpeg' }));
+  } catch (e) {
+    $('aviso').textContent = e.message;
+  } finally {
+    b.disabled = false;
+  }
 }
 
 async function carregarMetricas() {
@@ -307,6 +323,21 @@ function desenhar(r) {
       <div class="trilho"><div class="preenchimento" style="width:${p.probabilidade * 100}%"></div></div>
     </div>`).join('');
 
+  /* Gabarito: só em foto sorteada, onde a raça verdadeira é conhecida pelo
+     nome do arquivo. Mostrar o acerto e o erro na tela torna a demonstração
+     verificável em vez de uma caixa-preta — e um erro explicado vale mais na
+     bancada que mais um acerto de 97%. */
+  const g = $('gabarito');
+  if (gabarito) {
+    const certo = r.palpites[0].raca.toLowerCase() === gabarito.toLowerCase();
+    g.className = 'gabarito ' + (certo ? 'certo' : 'errado');
+    g.textContent = certo
+      ? `acertou: era mesmo um ${gabarito}`
+      : `era um ${gabarito} — a rede apostou em ${r.palpites[0].raca}`;
+  } else {
+    g.className = 'gabarito escondido';
+  }
+
   racaTopo = r.palpites[0].raca;
   $('titulo-perfil').textContent = 'Perfil de ' + racaTopo;
   $('perfil').textContent = '';
@@ -356,7 +387,10 @@ async function enviar(arquivo) {
   }
 }
 
-$('arquivo').onchange = (e) => e.target.files[0] && enviar(e.target.files[0]);
+$('arquivo').onchange = (e) => {
+  gabarito = null;                                // foto própria: sem gabarito
+  if (e.target.files[0]) enviar(e.target.files[0]);
+};
 
 /* ------------------------------------------------------------------
    Câmera ao vivo.
@@ -447,6 +481,7 @@ function identificar() {
   c.width = c.height = Math.min(lado, 900);      // 900px basta para 224 e sobra
   c.getContext('2d').drawImage(v, x, y, lado, lado, 0, 0, c.width, c.height);
 
+  gabarito = null;                                // captura: sem gabarito
   $('botao-disparar').disabled = true;
   c.toBlob(async (b) => {
     try {
@@ -457,6 +492,7 @@ function identificar() {
   }, 'image/jpeg', 0.92);
 }
 
+$('botao-sortear').onclick = sortear;
 $('botao-ligar').onclick = () => ligarCamera();
 $('botao-desligar').onclick = desligarCamera;
 $('botao-disparar').onclick = identificar;

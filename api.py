@@ -20,6 +20,7 @@ dezenas de desconhecidos.
 from __future__ import annotations
 
 import io
+import random
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -57,6 +58,13 @@ async def ciclo(app: FastAPI):
     # Carrega o detector aqui, e nao na primeira foto: os pesos sao baixados
     # do torchvision na primeira vez (~14 MB) e nao e na frente do visitante
     # que isso deve acontecer.
+    baralho = _baralho()
+    estado["baralho"] = baralho
+    estado["baralho_do_dataset"] = bool(baralho) and "oxford" in str(baralho[0])
+    estado["pilha"] = []
+    fonte = "dataset" if estado["baralho_do_dataset"] else "web/exemplos"
+    print(f"  sorteio: {len(baralho)} fotos ({fonte})")
+
     estado["detector"] = detector.disponivel()
     print(f"  detector de pet: {'pronto' if estado['detector'] else 'INDISPONIVEL (usa a foto inteira)'}")
 
@@ -159,19 +167,73 @@ def metricas():
     return r.metricas.to_dict()
 
 
+EXTENSOES = {".jpg", ".jpeg", ".png", ".webp"}
+
+
+def _baralho() -> list[Path]:
+    """Imagens sorteaveis, listadas uma vez na inicializacao.
+
+    Prefere o dataset inteiro (7349 fotos, 37 racas) e cai em web/exemplos/
+    quando ele nao foi baixado. Listar 7349 arquivos a cada clique seria
+    desperdicio numa bancada movimentada.
+    """
+    dataset = Path("data/oxford-iiit-pet/images")
+    if dataset.is_dir():
+        fotos = [p for p in dataset.iterdir() if p.suffix.lower() in EXTENSOES]
+        if fotos:
+            return fotos
+    pasta = WEB / "exemplos"
+    if pasta.is_dir():
+        return [p for p in pasta.iterdir() if p.suffix.lower() in EXTENSOES]
+    return []
+
+
 @app.get("/exemplos")
 def exemplos():
-    """Fotos de exemplo, para visitantes sem pet.
+    """Quantas fotos ha para sortear, e de onde vem.
 
-    Le o que existir em web/exemplos/. A galeria some sozinha se a pasta
-    estiver vazia, em vez de mostrar imagens quebradas na bancada.
+    A interface usa isso so para decidir se mostra o botao de sorteio: sem
+    foto nenhuma ele some, em vez de dar erro na frente do visitante.
     """
-    pasta = WEB / "exemplos"
-    if not pasta.is_dir():
-        return {"exemplos": []}
-    nomes = sorted(p.name for p in pasta.iterdir()
-                   if p.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"})
-    return {"exemplos": [f"/exemplos/{n}" for n in nomes]}
+    fotos = estado.get("baralho", [])
+    return {"quantidade": len(fotos),
+            "fonte": "dataset" if estado.get("baralho_do_dataset") else "pasta"}
+
+
+@app.get("/exemplos/aleatorio")
+def exemplo_aleatorio():
+    """Uma foto qualquer do banco.
+
+    Embaralha e consome, em vez de sortear a cada chamada: assim o visitante
+    nao ve a mesma foto duas vezes seguidas, que na bancada pareceria defeito.
+    """
+    fotos = estado.get("baralho", [])
+    if not fotos:
+        raise HTTPException(404, "nenhuma foto de exemplo disponivel")
+
+    pilha = estado.get("pilha") or []
+    if not pilha:
+        pilha = list(range(len(fotos)))
+        random.shuffle(pilha)
+    indice = pilha.pop()
+    estado["pilha"] = pilha
+
+    caminho = fotos[indice]
+
+    # A raca verdadeira esta no nome do arquivo do Oxford-IIIT Pet
+    # ("Maine_Coon_12.jpg", "american_pit_bull_terrier_100.jpg"). O arquivo
+    # nao preserva a caixa, entao casamos com o nome canonico das classes --
+    # senao a tela mostraria "era um american pit bull terrier".
+    bruto = caminho.stem.rsplit("_", 1)[0].replace("_", " ")
+    canonico = ""
+    a = estado.get("agente")
+    if a is not None:
+        canonico = next((n for n in a.class_names if n.lower() == bruto.lower()), "")
+
+    cabecalhos = {"Cache-Control": "no-store"}
+    if canonico or bruto:
+        cabecalhos["X-Raca-Verdadeira"] = canonico or bruto
+    return FileResponse(caminho, headers=cabecalhos)
 
 
 @app.get("/exemplos/{nome}")

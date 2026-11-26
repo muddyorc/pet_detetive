@@ -226,7 +226,8 @@ quebra exatamente a tese de privacidade do projeto.
 | `POST /responder` | texto livre do visitante → reponderação dos palpites |
 | `POST /perfil` | perfil longo da raça |
 | `GET /metricas` | contadores do evento |
-| `GET /exemplos` | galeria para quem não tem pet |
+| `GET /exemplos` | quantas fotos há para sortear |
+| `GET /exemplos/aleatorio` | uma foto qualquer do banco, com a raça verdadeira no cabeçalho |
 
 ### O teste que vale mais que os outros
 
