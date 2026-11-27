@@ -63,7 +63,8 @@ PROVEDORES: list[dict] = [
     {"nome": "groq", "rotulo": "Groq", "prefixos": ("gsk_",),
      "tipo": "openai", "base": "https://api.groq.com/openai/v1",
      "modelo": "llama-3.3-70b-versatile"},
-    {"nome": "gemini", "rotulo": "Google Gemini", "prefixos": ("AIza",),
+    # "AQ." e o formato novo do AI Studio; "AIza" e o antigo. Os dois valem.
+    {"nome": "gemini", "rotulo": "Google Gemini", "prefixos": ("AQ.", "AIza"),
      "tipo": "gemini", "base": "https://generativelanguage.googleapis.com/v1beta",
      "modelo": "gemini-2.0-flash"},
     {"nome": "openai", "rotulo": "OpenAI", "prefixos": ("sk-proj-", "sk-"),
@@ -127,9 +128,6 @@ PISTAS = (
               "Tokens OAuth expiram em cerca de uma hora e usam outro "
               "cabecalho. Pegue uma chave em aistudio.google.com/apikey -- "
               "ela comeca com AIzaSy."),
-    ("AQ.", "isso parece um token OAuth ou credencial de sessao do Google, "
-            "nao uma chave de API. Pegue uma chave em "
-            "aistudio.google.com/apikey -- ela comeca com AIzaSy."),
     ("Bearer ", "tire o 'Bearer ' da frente: cole so a credencial."),
     ("sk_live_", "isso e uma chave do Stripe, nao de um provedor de LLM."),
     ("ghp_", "isso e um token do GitHub, nao de um provedor de LLM."),
@@ -272,6 +270,22 @@ def _via_openai(p: dict, chave: str, sistema: str,
                    "tokens_saida": uso.get("completion_tokens", 0)}
 
 
+def _modelos_gemini(base: str, chave: str) -> list[str]:
+    """Modelos que essa chave pode usar. So para diagnostico."""
+    try:
+        r = requests.get(f"{base}/models", headers={"x-goog-api-key": chave},
+                         timeout=10)
+        if r.status_code >= 400:
+            return []
+        nomes = []
+        for m in r.json().get("models", []):
+            if "generateContent" in (m.get("supportedGenerationMethods") or []):
+                nomes.append(m.get("name", "").removeprefix("models/"))
+        return nomes
+    except requests.RequestException:
+        return []
+
+
 def _via_gemini(p: dict, chave: str, sistema: str,
                 mensagens: list[dict], max_tokens: int) -> tuple[str, dict]:
     base = os.environ.get("PET_LLM_BASE") or p["base"]
@@ -287,6 +301,15 @@ def _via_gemini(p: dict, chave: str, sistema: str,
                           json=corpo, headers={"x-goog-api-key": chave},
                           timeout=TIMEOUT_S)
         if r.status_code >= 400:
+            # Modelo invalido e o erro mais comum depois da chave: o catalogo
+            # do Gemini muda e o padrao daqui envelhece. Em vez de repassar
+            # um 404 cru, perguntamos a lista e dizemos o que existe.
+            if r.status_code == 404 or "model" in r.text.lower():
+                disponiveis = _modelos_gemini(base, chave)
+                if disponiveis:
+                    raise SemNuvem(
+                        f"{p['rotulo']}: o modelo '{modelo}' nao existe nessa "
+                        f"conta. Disponiveis: {', '.join(disponiveis[:6])}")
             raise SemNuvem(f"{p['rotulo']}: HTTP {r.status_code} — {r.text[:160]}")
         d = r.json()
     except requests.RequestException as e:
