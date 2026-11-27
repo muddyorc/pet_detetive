@@ -103,6 +103,21 @@ pip uninstall -y torch torchvision
 
 ---
 
+## 4b. Pesos do detector de pet (baixa sozinho)
+
+Antes de classificar, o sistema localiza o cão ou gato na foto e recorta — sem
+isso, o `CenterCrop(224)` do pipeline entrega o fundo ou o rosto de quem segura
+o celular. Os pesos (SSDLite320-MobileNetV3, ~14 MB) vêm do torchvision e são
+baixados **na primeira execução**, depois ficam em cache.
+
+Na bancada isso já aconteceu, porque a `api.py` carrega o detector na
+inicialização de propósito — não é na frente do visitante que esse download
+deve rodar. Mas **numa máquina nova, rode a API uma vez com internet** antes do
+evento.
+
+Sem os pesos e sem rede, o sistema usa a foto inteira: funciona pior, mas
+funciona.
+
 ## 5. Verificar sem dataset
 
 ```bash
@@ -213,19 +228,51 @@ inicialização — senão o primeiro visitante da bancada paga essa espera.
 
 ### Chave do LLM em nuvem
 
-Só o perfil longo da raça usa a nuvem. Sem a chave, o sistema **continua
-funcionando** e cai no SLM local, por especificação. Coloque a chave em `.env`
-na raiz do projeto quando tiver uma.
+**Pela interface**, não editando arquivo: clique na **engrenagem** no canto do
+cabeçalho, cole a chave e clique em *Testar e salvar*. O provedor é reconhecido
+pelo prefixo (`sk-ant-`, `AQ.`/`AIza`, `gsk_`, `sk-or-`, `sk-proj-`/`sk-`), e
+há uma lista manual para quando ele não for.
+
+A chave é testada antes de gravar. Se não souber o nome do modelo, o botão
+*Listar modelos* pergunta ao provedor quais a sua chave pode usar.
+
+Fica em `.env`, que está no `.gitignore` — **a chave não vem no clone**. Cada
+máquina configura a sua.
+
+**A engrenagem só funciona em `localhost`.** Com `python api.py --rede`, a API
+recusa a configuração vinda de fora: ler ou gravar a chave pela rede seria
+entregá-la a quem estiver na sala.
+
+Sem chave o sistema **continua funcionando**: a pergunta aberta cai no SLM
+local, mais lenta e com qualidade menor, e a interface mostra a rota usada.
 
 ---
 
 ## 9. Subir a aplicação
 
 ```bash
-uvicorn api:app --reload
+uvicorn api:app --reload          # só nesta máquina
+python api.py --rede              # aceita celulares da mesma rede
 ```
 
-E abra `http://localhost:8000`.
+E abra `http://localhost:8000`. A API carrega modelo, detector e índice uma vez
+e **aquece o SLM** — sem isso o primeiro visitante esperaria ~75 s pela primeira
+frase. Sobe em cerca de 4 segundos.
+
+O que você vai encontrar na tela:
+
+| Elemento | O que faz |
+| --- | --- |
+| **Escolher uma foto** | arquivo; no celular o próprio seletor oferece a câmera |
+| **Ligar a câmera** | câmera ao vivo, quadro quadrado; só em `localhost` ou HTTPS |
+| **Sortear um animal** | puxa uma das 7349 fotos do dataset e mostra o gabarito |
+| **Ver o perfil** | texto da raça, gerado localmente e guardado em cache |
+| **Pergunte sobre este animal** | chat; vai para a nuvem, com botão para comparar com o local |
+| **engrenagem** | chave de API |
+| rodapé | métricas do evento: fotos, % resolvido localmente, latências |
+
+As pastilhas do cabeçalho mostram o estado: modelo e dispositivo, SLM, nuvem e
+RAG. Verde é saudável; amarelo é degradado, não quebrado.
 
 ---
 
@@ -242,6 +289,11 @@ quebrar, o roteamento está errado.
 
 | Sintoma | Causa | Solução |
 | --- | --- | --- |
+| "Ligar a câmera" não aparece | acessou pelo IP da rede | o navegador só libera câmera em `localhost` ou HTTPS; use "Escolher uma foto" |
+| a engrenagem dá 403 | acessou pelo IP da rede | a chave só se configura na própria máquina |
+| classifica o fundo em vez do pet | pesos do detector não baixaram | rode a API uma vez com internet |
+| "prefixo não reconhecido" na chave | formato novo do provedor | escolha o provedor na lista do diálogo |
+| nome de modelo inválido | catálogo mudou | use *Listar modelos* e clique num nome |
 | `torch.cuda.is_available()` dá `False` com NVIDIA presente | roda de CPU instalada | `pip uninstall -y torch torchvision` e repita o passo 4 com `cu128` |
 | `CUDA out of memory` no treino | lote grande demais | `--batch-size 16` |
 | `data.py` começa a baixar e fica lento | `baixar_dataset.py` não rodou | interrompa, rode o passo 6 na ordem |
