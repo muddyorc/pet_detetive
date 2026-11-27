@@ -31,14 +31,16 @@ ROTA_PRETENDIDA = {
     "legenda": "local",
     "extracao": "local",
     "pergunta": "local",
-    "perfil": "nuvem",
+    "perfil": "local",
+    "pergunta_aberta": "nuvem",
 }
 
 MOTIVO = {
     "legenda": "dezenas de chamadas por sessao, precisa ser rapida",
     "extracao": "tarefa fechada, saida em JSON, nao precisa de modelo grande",
     "pergunta": "latencia percebida diretamente pelo visitante",
-    "perfil": "texto longo, uma vez por visitante",
+    "perfil": "entrada fixa e saida fixa: gera uma vez e guarda em cache",
+    "pergunta_aberta": "imprevisivel, as vezes exige o que a base nao tem",
 }
 
 
@@ -118,6 +120,9 @@ class Metricas:
 class Roteador:
     def __init__(self, metricas: Metricas | None = None):
         self.metricas = metricas or Metricas()
+        # Perfil por raca. Entrada fixa, saida fixa -- nao ha por que gerar
+        # duas vezes. Sao no maximo 37 entradas.
+        self._cache_perfil: dict[str, tuple[str, dict]] = {}
 
     # ------------------------------------------------------------------
     def estado(self) -> dict:
@@ -204,7 +209,7 @@ class Roteador:
 
     def perguntar(self, pergunta: str, trechos: list[str],
                   historico: list[dict] | None = None,
-                  aprofundar: bool = False) -> tuple[str, dict]:
+                  local: bool = False) -> tuple[str, dict]:
         """Pergunta aberta do visitante.
 
         POR QUE A ROTA NAO E ADIVINHADA
@@ -225,17 +230,33 @@ class Roteador:
 
         O QUE FAZEMOS
         -------------
-        Toda pergunta e respondida LOCALMENTE primeiro, em um a tres segundos.
-        Sob a resposta, o visitante pode pedir para aprofundar, e so ai a
-        nuvem entra (`aprofundar=True`).
+        Roteamos por DIFICULDADE DA TAREFA, nao por palpite sobre a pergunta:
 
-        Isso e melhor que acertar o roteamento escondido: o visitante ve as
-        duas rotas e sente a diferenca de latencia e de profundidade. A tese
-        de ESW489 -- o caminho quente e local, a nuvem e excecao -- deixa de
-        ser uma afirmacao do banner e vira algo demonstravel na bancada. E
-        nenhum roteamento errado e possivel.
+            perfil da raca    -> local   sete campos fixos do racas.json
+                                         virando tres paragrafos. Mesma
+                                         entrada, mesma saida, sem raciocinio.
+            pergunta aberta   -> nuvem   imprevisivel, as vezes exige o que a
+                                         base nao tem ("quanto custa?")
+
+        A versao anterior fazia o inverso -- e estava errada. O perfil e o
+        trabalho facil e estava indo para a nuvem; a pergunta e o dificil e
+        ficava no modelo pequeno.
+
+        O argumento que sustentava o desenho antigo era latencia: o caminho
+        quente precisa ser rapido, logo local. Medimos e ele nao se sustenta:
+
+            perfil pela nuvem (gemini-3.5-flash-lite)   3180 ms
+            pergunta pelo SLM local (llama3.2:3b)       3092 ms
+
+        Sao iguais. Com a latencia empatada, o criterio que sobra e qualidade,
+        e ai a nuvem ganha na tarefa dificil.
+
+        O botao da tela inverteu junto: antes oferecia "aprofundar com a
+        nuvem", agora oferece "comparar com o modelo local" (`local=True`).
+        A comparacao lado a lado continua possivel, que e o que torna o
+        roteamento demonstravel na bancada em vez de afirmado no banner.
         """
-        if aprofundar and llm.disponivel():
+        if not local and llm.disponivel():
             try:
                 texto, tel = llm.responder(pergunta, trechos, historico)
                 termo = slm.violou_guardrail(texto)
@@ -259,8 +280,33 @@ class Roteador:
         return self._curto("pergunta_aberta", prompt, reserva, max_tokens=150)
 
     def perfil(self, raca: str, trechos: list[str]) -> tuple[str, dict]:
-        """Perfil longo. A unica tarefa que tenta a nuvem."""
-        texto, tel = llm.perfil(raca, trechos)
+        """Perfil longo da raca. SEMPRE local, e guardado em cache.
+
+        A entrada e fixa -- os sete campos que racas.json tem para a raca --
+        e a saida tambem deveria ser. Gerar de novo a cada visitante que
+        encontra um Pug e desperdicio: o segundo em diante sai instantaneo.
+
+        Com 37 racas, o cache cabe inteiro na memoria e se enche sozinho ao
+        longo do evento.
+        """
+        if raca in self._cache_perfil:
+            texto, tel = self._cache_perfil[raca]
+            self.metricas.registrar("perfil", "cache", 0.0)
+            return texto, {**tel, "rota": "cache"}
+
+        try:
+            texto, tel = llm._pelo_slm(raca, trechos)
+        except slm.SLMIndisponivel as e:
+            # Sem Ollama, entrega a propria base: texto escrito a mao e
+            # revisado. Feio, mas honesto, e melhor que uma tela de erro na
+            # bancada. Esta captura existe porque o teste_offline.py a cobrou:
+            # ao trazer o perfil para o local eu havia perdido o fallback que
+            # morava no llm.perfil().
+            tel = {"rota": "base", "latencia_ms": 0.0, "tokens_entrada": 0,
+                   "tokens_saida": 0, "motivo_fallback": str(e)}
+            texto = "\n".join(trechos)
+            self.metricas.registrar("perfil", "base", 0.0, erro=True)
+            return texto, tel
 
         # O mesmo guardrail do texto curto. Aqui a reserva e a propria base de
         # conhecimento: texto escrito a mao, revisado, e que por construcao
@@ -272,6 +318,8 @@ class Roteador:
 
         self.metricas.registrar("perfil", tel["rota"], tel["latencia_ms"],
                                 tel.get("tokens_entrada", 0), tel.get("tokens_saida", 0))
+        if tel["rota"] == "local":
+            self._cache_perfil[raca] = (texto, tel)
         return texto, tel
 
 

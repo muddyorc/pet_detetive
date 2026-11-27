@@ -210,6 +210,38 @@ A especie que o detector devolve (`cao`/`gato`) e so informativa e **nao vai
 para a tela**: o COCO e generico e erra entre as duas com frequencia — na cena
 de teste chamou um Pug de gato. Quem sabe a especie e a raca classificada.
 
+**O roteamento foi INVERTIDO em 25/11, e a restricao 4 mudou com ele.**
+
+A especificacao original mandava o perfil longo para a nuvem e deixava tudo o
+mais local, com o argumento de que o caminho quente precisa ser rapido. Medimos
+com a chave do Gemini funcionando e o argumento caiu:
+
+| Tarefa | Rota | Latencia | Qualidade |
+| --- | --- | --- | --- |
+| pergunta aberta | nuvem (gemini-3.5-flash-lite) | **0,9–1,1 s** | separa o que a base sustenta do que e inferencia |
+| pergunta aberta | local (llama3.2:3b) | 3,0–3,5 s | **inventou**: "silhueta retangular e baixa pode ser um problema em espacos estreitos" |
+| perfil da raca | local | 4,7 s na 1a vez, **2 ms** depois (cache) | suficiente |
+
+A nuvem nao e mais lenta -- e **tres vezes mais rapida** que o SLM local nesta
+maquina. Com a latencia a favor dela, o criterio que sobra e qualidade.
+
+E o perfil e a tarefa FACIL: sete campos fixos do racas.json virando tres
+paragrafos, mesma entrada e mesma saida. Mandar isso para a nuvem e deixar a
+pergunta aberta -- a tarefa dificil -- no modelo pequeno era o inverso do
+sensato. O perfil agora e local e fica em cache por raca.
+
+**O exemplo que decide a discussao:** perguntado se um Scottish Terrier serve
+para apartamento pequeno, o modelo local respondeu que a "silhueta retangular e
+baixa pode ser um problema em espacos estreitos". Isso nao esta na base e nao
+faz sentido -- e exatamente a alucinacao que racas.json existe para impedir. A
+nuvem respondeu a partir de "energia media, passeios diarios" e disse em qual
+ponto estava inferindo.
+
+Entao a restricao 4 passa a ser: **o caminho quente e local; a nuvem entra na
+tarefa dificil.** Legenda, extracao estruturada, pergunta de refinamento e
+perfil continuam locais -- sao a maioria das chamadas. So a pergunta aberta vai
+para fora, e sem rede ela cai no local como todo o resto.
+
 **O chat nao adivinha a rota, e isso foi medido.** `POST /perguntar` responde
 toda pergunta LOCALMENTE primeiro; sob a resposta o visitante pode pedir para
 aprofundar, e so ai a nuvem entra. Tentamos decidir sozinhos de duas formas,

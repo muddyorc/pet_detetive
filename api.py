@@ -98,7 +98,7 @@ class Configuracao(BaseModel):
 class Pergunta(BaseModel):
     sessao: str
     pergunta: str
-    aprofundar: bool = False
+    local: bool = False         # força a resposta pelo SLM local, para comparar
 
 
 class PedidoPerfil(BaseModel):
@@ -181,8 +181,7 @@ def perguntar(corpo: Pergunta):
     if not corpo.pergunta.strip():
         raise HTTPException(400, "pergunta vazia")
     try:
-        return a.perguntar(corpo.sessao, corpo.pergunta.strip(),
-                           corpo.aprofundar)
+        return a.perguntar(corpo.sessao, corpo.pergunta.strip(), corpo.local)
     except ValueError as e:
         raise HTTPException(400, str(e))
 

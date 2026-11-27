@@ -33,7 +33,14 @@ import sys
 def main() -> int:
     # Antes de importar slm: a URL base e lida na importacao do modulo.
     os.environ["OLLAMA_HOST"] = "http://127.0.0.1:59999"
-    os.environ.pop("ANTHROPIC_API_KEY", None)
+
+    # Vazio, nao removido. O llm.py chama load_dotenv() na importacao, e o
+    # .env agora pode ter a chave; load_dotenv nao sobrescreve variavel que ja
+    # existe, entao definir como "" bloqueia a leitura do arquivo. Remover com
+    # pop() deixaria o .env repor a chave e o teste nao simularia queda
+    # nenhuma -- foi o que aconteceu assim que uma chave real foi configurada.
+    for nome in ("ANTHROPIC_API_KEY", "PET_LLM_CHAVE", "PET_LLM_PROVEDOR"):
+        os.environ[nome] = ""
 
     from PIL import Image
 

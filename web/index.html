@@ -297,9 +297,10 @@
     <div class="cartao">
       <strong>Pergunte sobre este animal</strong>
       <div class="nota" style="margin-top: 4px;">
-        As respostas saem da base de conhecimento local. Toda pergunta é
-        respondida aqui na máquina; só se você pedir para aprofundar é que o
-        modelo em nuvem entra.
+        As respostas são ancoradas na base de conhecimento local. A pergunta
+        aberta é a tarefa difícil, então vai para o modelo em nuvem; o perfil,
+        que é sempre o mesmo texto, fica aqui na máquina. Sem chave ou sem
+        rede, tudo cai no modelo local.
       </div>
       <div id="conversa"></div>
       <form class="linha" id="forma-pergunta" style="margin-top: 12px;">
@@ -643,10 +644,10 @@ function pintarTurno(pergunta) {
   return div;
 }
 
-async function perguntar(pergunta, aprofundar, div) {
+async function perguntar(pergunta, local, div) {
   const resp = await fetch('/perguntar', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sessao, pergunta, aprofundar }),
+    body: JSON.stringify({ sessao, pergunta, local }),
   });
   if (!resp.ok) throw new Error('não consegui responder agora');
   const r = await resp.json();
@@ -658,13 +659,17 @@ async function perguntar(pergunta, aprofundar, div) {
     `${r.trechos_usados} trechos da base (RAG ${r.rag_ms} ms)` +
     (r.comparou_com ? ` · comparou com ${r.comparou_com}` : '') + '</span>';
 
-  if (r.pode_aprofundar) {
+  /* O botão inverteu junto com o roteamento: a nuvem responde por padrão e
+     a comparação oferecida é com o modelo local. Perguntar a mesma coisa nas
+     duas rotas, lado a lado, é o que torna o roteamento demonstrável numa
+     bancada em vez de apenas afirmado no banner. */
+  if (r.pode_comparar) {
     const b = document.createElement('button');
     b.className = 'aprofundar';
-    b.textContent = 'aprofundar com o modelo em nuvem ↗';
+    b.textContent = 'comparar com o modelo local ↙';
     b.onclick = async () => {
       b.disabled = true;
-      div.querySelector('.resposta').textContent = 'consultando a nuvem…';
+      div.querySelector('.resposta').textContent = 'perguntando ao modelo local…';
       try { await perguntar(pergunta, true, div); }
       catch (e) { div.querySelector('.resposta').textContent = e.message; }
     };

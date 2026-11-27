@@ -309,7 +309,7 @@ class Agente:
         }
 
     def perguntar(self, sessao_id: str, pergunta: str,
-                  aprofundar: bool = False) -> dict:
+                  local: bool = False) -> dict:
         """Chat sobre o animal, ancorado na base de conhecimento.
 
         A recuperacao e escopada na raca do topo da sessao. Se o visitante
@@ -334,7 +334,7 @@ class Agente:
             trechos += [str(t) for t in self.indice.perfil_bruto(outra)]
 
         texto, tel = self.roteador.perguntar(
-            pergunta, trechos, s.conversa, aprofundar=aprofundar)
+            pergunta, trechos, s.conversa, local=local)
 
         s.conversa.append({"papel": "user", "texto": pergunta})
         s.conversa.append({"papel": "assistant", "texto": texto})
@@ -345,7 +345,8 @@ class Agente:
                 "comparou_com": citadas[0] if citadas else None,
                 "trechos_usados": len(trechos),
                 "rag_ms": round(tel_rag["latencia_ms"], 1),
-                "pode_aprofundar": tel["rota"] != "nuvem"}
+                # Oferece a comparacao com a outra rota, seja qual for a usada.
+                "pode_comparar": tel["rota"] == "nuvem"}
 
     def perfil(self, sessao_id: str, raca: str) -> dict:
         s = self.sessao(sessao_id)
