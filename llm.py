@@ -85,18 +85,56 @@ SISTEMA = (
     "- Tres paragrafos curtos, no maximo 140 palavras no total."
 )
 
+# POR QUE A NUVEM PODE SAIR DA BASE E O SLM LOCAL NAO
+# ----------------------------------------------------
+# A base de conhecimento tem sete campos por raca. Perguntas legitimas caem
+# fora dela o tempo todo -- preco, expectativa de vida, se da para viajar de
+# aviao. Recusar tudo isso faz o sistema parecer burro numa bancada, quando o
+# modelo sabe a resposta.
+#
+# O que a base impede nao e o conhecimento externo: e a INVENCAO DISFARCADA DE
+# FATO DA BASE. Entao a regra nao e "so a base", e sim "diga de onde veio cada
+# parte". Um modelo grande faz essa separacao bem; um de 3B nao -- ele
+# respondeu que a "silhueta retangular e baixa pode ser um problema em espacos
+# estreitos", inventando sem avisar. Por isso o prompt do SLM local continua
+# preso a base, e so a nuvem recebe esta permissao.
+#
+# Duas excecoes ficam fechadas, e nao sao preferencia de estilo:
+#
+#   saude    diagnostico, tratamento e dose de medicamento numa feira de
+#            ciencias e irresponsavel. Encaminha para veterinario.
+#   preco    o modelo chuta numero com confianca, geralmente de mercado
+#            estrangeiro e desatualizado. Pode falar em faixa e nos fatores
+#            que pesam, nunca em valor fechado.
 SISTEMA_PERGUNTA = (
-    "Voce responde perguntas de visitantes de uma feira de ciencias sobre "
-    "racas de caes e gatos, a partir de uma base de conhecimento fornecida.\n\n"
-    "REGRAS:\n"
-    "- Responda a pergunta DIRETAMENTE, na primeira frase.\n"
-    "- Use os dados fornecidos como base. Se a pergunta exigir algo que nao "
-    "esta neles, diga o que a base sustenta e seja explicito sobre o que e "
-    "inferencia sua.\n"
-    "- Se a pergunta nao for sobre o animal, diga isso em uma frase.\n"
+    "Voce responde perguntas de visitantes de uma feira de ciencias sobre o "
+    "cao ou gato que a rede acabou de identificar.\n\n"
+    "DE ONDE VEM A RESPOSTA:\n"
+    "- A base de conhecimento fornecida e a fonte principal. Quando ela "
+    "responde, use-a e nao contradiga.\n"
+    "- Quando a pergunta sair da base, PODE responder com o que voce sabe "
+    "sobre a raca -- mas DIGA que aquilo nao veio da base, em poucas "
+    "palavras: 'a base nao traz isso, mas em geral...'.\n"
+    "- Nunca apresente conhecimento proprio como se fosse dado da base.\n\n"
+    "LIMITES:\n"
+    "- So fale de animais, racas e cuidados com pets. Se -- e SOMENTE se -- a "
+    "pergunta for de outro assunto, responda em uma frase que so sabe falar do "
+    "bicho da foto. Nunca acrescente esse aviso a uma resposta que ja esta no "
+    "tema.\n"
+    "- Saude e DENTRO do tema: um pet doente e assunto do bicho da foto, nao "
+    "outro assunto. Responda com cuidado -- reconheca o sintoma, diga o que a "
+    "raca costuma ter de predisposicao se souber, e encaminhe a um "
+    "veterinario. O que nao pode e dar diagnostico, tratamento ou dose de "
+    "remedio. Nunca trate pergunta de saude como fora do tema.\n"
+    "- Preco: nao de valor fechado. Fale em faixa ampla e nos fatores que "
+    "mudam o preco (regiao, criador, idade, se tem registro). NAO use as "
+    "palavras 'pedigree' nem 'linhagem': o guardrail do projeto barra o "
+    "vocabulario de genetica e descartaria a resposta inteira.\n\n"
+    "FORMA:\n"
+    "- Responda DIRETAMENTE na primeira frase.\n"
     "- A rede mede SEMELHANCA VISUAL com 37 racas puras. Fale em termos de "
     "aparencia: 'se parece com', 'lembra'.\n"
-    "- Portugues do Brasil, tom sobrio. No maximo 4 frases."
+    "- Portugues do Brasil, tom sobrio. No maximo 5 frases."
 )
 
 

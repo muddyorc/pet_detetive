@@ -210,6 +210,34 @@ A especie que o detector devolve (`cao`/`gato`) e so informativa e **nao vai
 para a tela**: o COCO e generico e erra entre as duas com frequencia — na cena
 de teste chamou um Pug de gato. Quem sabe a especie e a raca classificada.
 
+**A nuvem PODE sair da base, desde que diga que saiu.** Perguntas legitimas
+caem fora dos sete campos do racas.json o tempo todo -- preco, expectativa de
+vida, viajar de aviao. Recusar tudo isso faz o sistema parecer burro na bancada
+quando o modelo sabe a resposta.
+
+O que a base impede nao e conhecimento externo: e **invencao disfarcada de fato
+da base**. Entao a regra nao e "so a base", e sim "diga de onde veio cada
+parte". A nuvem faz essa separacao bem; o SLM local nao -- ele inventou a
+"silhueta retangular e baixa" sem avisar. Por isso o prompt do SLM local
+continua preso a base e so a nuvem recebe a permissao.
+
+Duas excecoes ficam fechadas, e nao sao preferencia de estilo:
+
+| Caso | Comportamento |
+| --- | --- |
+| saude | reconhece o sintoma, cita predisposicao da raca, encaminha ao veterinario. Nunca diagnostico, tratamento ou dose |
+| preco | faixa ampla e fatores (regiao, criador, idade, registro). Nunca valor fechado |
+| fora do tema | uma frase dizendo que so fala do bicho da foto |
+
+**Saude e DENTRO do tema.** Numa primeira versao o prompt apertou tanto o
+limite de assunto que um pet vomitando virou "so sei falar do bicho da foto" --
+pior resposta possivel. Pet doente e assunto do pet.
+
+**Cuidado com o guardrail ao escrever prompts:** a primeira versao mandava citar
+`pedigree` como fator de preco, e `pedigree` esta em `TERMOS_PROIBIDOS`. O
+filtro descartou a resposta que o proprio prompt pediu. Se um prompt novo
+precisar de uma palavra dessa lista, mude o prompt, nao a lista.
+
 **O roteamento foi INVERTIDO em 25/11, e a restricao 4 mudou com ele.**
 
 A especificacao original mandava o perfil longo para a nuvem e deixava tudo o
