@@ -335,7 +335,11 @@ async function carregarSaude() {
       `<span class="pastilha ok">${s.modelo} · ${s.dispositivo}</span>`,
       `<span class="pastilha ${s.slm_disponivel ? 'ok' : 'off'}">SLM ${s.slm_disponivel ? 'local' : 'fora'}</span>`,
       `<span class="pastilha ${s.nuvem_disponivel ? 'ok' : 'off'}">nuvem ${s.nuvem_disponivel ? 'ok' : 'sem chave'}</span>`,
-      `<span class="pastilha">RAG ${s.rag}</span>`,
+      // A pastilha do RAG ficava cinza por esquecimento meu, o que parecia
+      // defeito. O índice sempre carrega: o TF-IDF não depende de nada externo.
+      `<span class="pastilha ok" title="Busca sobre conhecimento/racas.json: ` +
+        `${s.rag_trechos} trechos de ${s.rag_racas} raças, rota ${s.rag}">` +
+        `RAG ${s.rag} · ${s.rag_trechos}</span>`,
     ].join('');
   } catch { $('estado').innerHTML = '<span class="pastilha off">API fora</span>'; }
 }

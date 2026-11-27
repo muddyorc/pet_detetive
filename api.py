@@ -128,6 +128,8 @@ def saude():
         "slm_quente": estado.get("slm_quente", False),
         "nuvem_disponivel": llm.disponivel(),
         "rag": a.indice.rota,
+        "rag_trechos": len(a.indice.trechos),
+        "rag_racas": len({t.raca for t in a.indice.trechos}),
     }
 
 
