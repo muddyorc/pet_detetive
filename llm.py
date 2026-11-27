@@ -120,6 +120,33 @@ def limpar(chave: str | None) -> str:
     return chave.strip().strip('"').strip("'").strip()
 
 
+# Erros de credencial que valem um aviso especifico, porque o erro cru do
+# provedor ("API key not valid") nao diz o que fazer.
+PISTAS = (
+    ("ya29.", "isso e um token OAuth do Google, nao uma chave de API. "
+              "Tokens OAuth expiram em cerca de uma hora e usam outro "
+              "cabecalho. Pegue uma chave em aistudio.google.com/apikey -- "
+              "ela comeca com AIzaSy."),
+    ("AQ.", "isso parece um token OAuth ou credencial de sessao do Google, "
+            "nao uma chave de API. Pegue uma chave em "
+            "aistudio.google.com/apikey -- ela comeca com AIzaSy."),
+    ("Bearer ", "tire o 'Bearer ' da frente: cole so a credencial."),
+    ("sk_live_", "isso e uma chave do Stripe, nao de um provedor de LLM."),
+    ("ghp_", "isso e um token do GitHub, nao de um provedor de LLM."),
+    ("hf_", "isso e um token do Hugging Face. O projeto nao usa a Inference "
+            "API deles; use Anthropic, OpenAI, Groq, OpenRouter ou Gemini."),
+)
+
+
+def pista(chave: str | None) -> str:
+    """Aviso util quando a credencial colada e do tipo errado."""
+    limpa = limpar(chave)
+    for prefixo, texto in PISTAS:
+        if limpa.startswith(prefixo):
+            return texto
+    return ""
+
+
 def por_nome(nome: str | None) -> dict | None:
     if not nome:
         return None
@@ -297,10 +324,11 @@ def _chamar(sistema: str, mensagens: list[dict],
 def testar(chave: str, modelo: str = "", provedor: str = "",
            base: str = "") -> dict:
     """Chamada minima, para a tela de configuracao dizer se a chave serve."""
+    dica = pista(chave)
     p = identificar(chave, provedor)
     if p is None:
         return {"ok": False,
-                "erro": "nao reconheci o prefixo — escolha o provedor na lista"}
+                "erro": dica or "nao reconheci o prefixo — escolha o provedor na lista"}
 
     antes = (os.environ.get("PET_LLM_CHAVE"), os.environ.get("PET_LLM_MODELO"),
              os.environ.get("PET_LLM_PROVEDOR"), os.environ.get("PET_LLM_BASE"))
@@ -317,7 +345,10 @@ def testar(chave: str, modelo: str = "", provedor: str = "",
                 "modelo": tel["modelo"], "latencia_ms": round(tel["latencia_ms"]),
                 "resposta": texto[:60]}
     except SemNuvem as e:
-        return {"ok": False, "provedor": p["nome"], "erro": str(e)}
+        # A dica vem primeiro: "API key not valid" nao diz o que fazer, e
+        # "isso e um token OAuth, pegue uma chave em ..." diz.
+        return {"ok": False, "provedor": p["nome"],
+                "erro": f"{dica} ({e})" if dica else str(e)}
     finally:
         for nome, valor in zip(("PET_LLM_CHAVE", "PET_LLM_MODELO",
                                 "PET_LLM_PROVEDOR", "PET_LLM_BASE"), antes):
