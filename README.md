@@ -250,12 +250,17 @@ reconhecido pelo prefixo:
 | `sk-ant-` | Anthropic (Claude) | `claude-opus-5-5` |
 | `sk-or-` | OpenRouter | `anthropic/claude-sonnet-4.5` |
 | `gsk_` | Groq | `llama-3.3-70b-versatile` |
-| `AQ.`, `AIza` | Google Gemini | `gemini-2.0-flash` |
+| `AQ.`, `AIza` | Google Gemini | `gemini-3.5-flash-lite` |
 | `sk-proj-`, `sk-` | OpenAI | `gpt-4o-mini` |
 
 O Google emite chaves do Gemini nos dois formatos: `AQ.…` (atual, pelo AI
 Studio) e `AIzaSy…` (antigo). Os dois são aceitos. Se o prefixo não for
 reconhecido, escolha o provedor na lista — ela vence a detecção automática.
+
+**Não sabe o nome do modelo?** O botão *Listar modelos* pergunta ao provedor
+quais a sua chave pode usar e mostra a lista; clique num nome para preenchê-lo.
+O catálogo muda mais rápido que este README — o padrão do Gemini aqui já ficou
+obsoleto uma vez.
 
 A chave é **testada antes de ser gravada** — uma chamada mínima ao provedor. Se
 não servir, o erro dele aparece na tela e nada é salvo. O campo de modelo é

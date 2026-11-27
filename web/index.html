@@ -215,6 +215,8 @@
              placeholder="endpoint próprio (opcional — só para compatíveis com OpenAI)">
       <div class="linha" style="margin-top:14px">
         <button class="botao principal" id="salvar-chave">Testar e salvar</button>
+        <!-- O catálogo dos provedores muda; perguntar é melhor que adivinhar. -->
+        <button class="botao" id="listar-modelos">Listar modelos</button>
         <button class="botao" id="remover-chave">Remover</button>
         <button class="botao" id="fechar-modal">Fechar</button>
       </div>
@@ -792,6 +794,39 @@ async function salvarChave(chave) {
 $('botao-config').onclick = abrirConfig;
 $('fechar-modal').onclick = () => $('modal').classList.add('escondido');
 $('modal').onclick = (e) => { if (e.target === $('modal')) $('modal').classList.add('escondido'); };
+$('listar-modelos').onclick = async () => {
+  const r = $('resultado-config');
+  r.className = 'resultado-config';
+  r.textContent = 'perguntando ao provedor…';
+  try {
+    const resp = await fetch('/configuracao/modelos', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chave: $('campo-chave').value.trim(),
+        provedor: $('campo-provedor').value,
+        base: $('campo-base').value.trim(),
+      }),
+    });
+    const d = await resp.json();
+    if (!d.ok) {
+      r.className = 'resultado-config erro';
+      r.textContent = d.erro || d.detail || 'não consegui listar';
+      return;
+    }
+    r.className = 'resultado-config ok';
+    r.innerHTML = `${d.modelos.length} modelos nessa conta — clique para usar:<br>` +
+      d.modelos.map((m) =>
+        `<button class="aprofundar" style="margin:4px 4px 0 0" data-m="${m}">${m}</button>`
+      ).join('');
+    r.querySelectorAll('button[data-m]').forEach((b) => {
+      b.onclick = () => { $('campo-modelo').value = b.dataset.m; };
+    });
+  } catch {
+    r.className = 'resultado-config erro';
+    r.textContent = 'não consegui falar com a API';
+  }
+};
+
 $('salvar-chave').onclick = () => salvarChave($('campo-chave').value.trim());
 $('remover-chave').onclick = () => salvarChave('');
 document.addEventListener('keydown', (e) => {

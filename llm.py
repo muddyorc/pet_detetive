@@ -66,7 +66,7 @@ PROVEDORES: list[dict] = [
     # "AQ." e o formato novo do AI Studio; "AIza" e o antigo. Os dois valem.
     {"nome": "gemini", "rotulo": "Google Gemini", "prefixos": ("AQ.", "AIza"),
      "tipo": "gemini", "base": "https://generativelanguage.googleapis.com/v1beta",
-     "modelo": "gemini-2.0-flash"},
+     "modelo": "gemini-3.5-flash-lite"},
     {"nome": "openai", "rotulo": "OpenAI", "prefixos": ("sk-proj-", "sk-"),
      "tipo": "openai", "base": "https://api.openai.com/v1",
      "modelo": "gpt-4o-mini"},
@@ -268,6 +268,41 @@ def _via_openai(p: dict, chave: str, sistema: str,
     uso = d.get("usage") or {}
     return texto, {"tokens_entrada": uso.get("prompt_tokens", 0),
                    "tokens_saida": uso.get("completion_tokens", 0)}
+
+
+def listar_modelos(chave: str, provedor: str = "", base: str = "") -> dict:
+    """Modelos que ESTA chave pode usar, perguntados ao proprio provedor.
+
+    Existe porque o catalogo envelhece mais rapido que o codigo: o padrao do
+    Gemini aqui ja ficou obsoleto uma vez. Em vez de alguem adivinhar o nome
+    do modelo, a tela pergunta e mostra a lista.
+    """
+    p = identificar(chave, provedor)
+    if p is None:
+        return {"ok": False, "erro": "escolha o provedor na lista"}
+
+    alvo = base or p.get("base", "")
+    limpa = limpar(chave)
+    try:
+        if p["tipo"] == "gemini":
+            nomes = _modelos_gemini(alvo, limpa)
+        elif p["tipo"] == "openai":
+            r = requests.get(f"{alvo}/models",
+                             headers={"Authorization": f"Bearer {limpa}"}, timeout=15)
+            if r.status_code >= 400:
+                return {"ok": False, "erro": f"HTTP {r.status_code} — {r.text[:140]}"}
+            nomes = sorted(m.get("id", "") for m in r.json().get("data", []))
+        else:
+            import anthropic
+            cliente = anthropic.Anthropic(api_key=limpa, timeout=15, max_retries=1)
+            nomes = [m.id for m in cliente.models.list(limit=30)]
+    except Exception as e:
+        return {"ok": False, "erro": str(e)[:200]}
+
+    if not nomes:
+        return {"ok": False, "erro": "o provedor nao devolveu nenhum modelo"}
+    return {"ok": True, "provedor": p["nome"], "rotulo": p["rotulo"],
+            "modelos": nomes[:40]}
 
 
 def _modelos_gemini(base: str, chave: str) -> list[str]:

@@ -272,6 +272,20 @@ def gravar_configuracao(corpo: Configuracao, req: Request):
             "mascara": llm.mascarar(chave)}
 
 
+@app.post("/configuracao/modelos")
+def listar_modelos(corpo: Configuracao, req: Request):
+    """Pergunta ao provedor quais modelos essa chave pode usar.
+
+    O catalogo envelhece mais rapido que o codigo -- o padrao do Gemini aqui
+    ja ficou obsoleto uma vez. Melhor perguntar do que adivinhar.
+    """
+    _so_local(req)
+    if not corpo.chave.strip():
+        raise HTTPException(400, "cole a chave primeiro")
+    return llm.listar_modelos(corpo.chave.strip(), corpo.provedor.strip(),
+                              corpo.base.strip())
+
+
 @app.get("/metricas")
 def metricas():
     r = estado.get("roteador")
