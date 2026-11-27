@@ -240,11 +240,31 @@ Simula o Ollama e a nuvem fora do ar. Classificação, mapa, decisão e frases
 curtas têm que continuar funcionando; só o perfil longo degrada, e com aviso.
 Se qualquer outra coisa quebrar, o roteamento está errado.
 
-### Sem a chave da API
+### A chave da API
 
-O sistema funciona. Sem `ANTHROPIC_API_KEY`, o perfil longo é escrito pelo SLM
-local em vez da nuvem, e a interface mostra a rota usada. Essa degradação é por
-especificação, não um defeito: `GET /saude` informa `nuvem_disponivel: false`.
+Clique na **engrenagem**, no canto do cabeçalho, e cole a chave. O provedor é
+reconhecido pelo prefixo:
+
+| Prefixo | Provedor | Modelo padrão |
+| --- | --- | --- |
+| `sk-ant-` | Anthropic (Claude) | `claude-opus-5-5` |
+| `sk-or-` | OpenRouter | `anthropic/claude-sonnet-4.5` |
+| `gsk_` | Groq | `llama-3.3-70b-versatile` |
+| `AIza` | Google Gemini | `gemini-2.0-flash` |
+| `sk-proj-`, `sk-` | OpenAI | `gpt-4o-mini` |
+
+A chave é **testada antes de ser gravada** — uma chamada mínima ao provedor. Se
+não servir, o erro dele aparece na tela e nada é salvo. O campo de modelo é
+opcional: vazio usa o padrão da tabela.
+
+Fica em `.env`, que está no `.gitignore`. **A tela só abre em `localhost`**: com
+`--rede`, a API recusa `/configuracao` vindo de fora, porque ler ou gravar a
+chave pela rede seria entregá-la a quem estiver na sala. E a chave nunca volta
+do servidor — só a máscara (`sk-ant-…1234`), o provedor e o modelo.
+
+Sem chave o sistema **continua funcionando**: perfil e respostas saem do modelo
+local, e a interface mostra a rota usada. Essa degradação é por especificação,
+não um defeito — `GET /saude` informa `nuvem_disponivel: false`.
 
 ## Uma regra que vale mais que o código
 
