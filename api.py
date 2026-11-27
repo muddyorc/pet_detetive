@@ -20,12 +20,13 @@ dezenas de desconhecidos.
 from __future__ import annotations
 
 import io
+import os
 import random
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel
@@ -85,6 +86,11 @@ app = FastAPI(title="Pet Detetive", lifespan=ciclo)
 class Resposta(BaseModel):
     sessao: str
     texto: str
+
+
+class Configuracao(BaseModel):
+    chave: str = ""
+    modelo: str = ""
 
 
 class Pergunta(BaseModel):
@@ -177,6 +183,78 @@ def perguntar(corpo: Pergunta):
                            corpo.aprofundar)
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+
+CAMINHO_ENV = Path(__file__).parent / ".env"
+
+
+def _so_local(req: Request) -> None:
+    """Configuracao so pela propria maquina.
+
+    Com `--rede`, qualquer pessoa no Wi-Fi alcanca a API. Ler ou gravar a
+    chave de API pela rede seria entregar a chave a quem estiver na sala, e
+    numa feira isso e muita gente. A bancada configura no proprio notebook.
+    """
+    host = req.client.host if req.client else ""
+    if host not in {"127.0.0.1", "::1", "localhost"}:
+        raise HTTPException(403, "a chave so pode ser configurada na propria maquina")
+
+
+def _gravar_env(chave: str, modelo: str) -> None:
+    """Reescreve as linhas do projeto no .env, preservando o resto."""
+    linhas = []
+    if CAMINHO_ENV.exists():
+        linhas = [l for l in CAMINHO_ENV.read_text(encoding="utf-8").splitlines()
+                  if not l.startswith(("PET_LLM_CHAVE=", "PET_LLM_MODELO="))]
+    if chave:
+        linhas.append(f"PET_LLM_CHAVE={chave}")
+        if modelo:
+            linhas.append(f"PET_LLM_MODELO={modelo}")
+    CAMINHO_ENV.write_text(chr(10).join(linhas) + chr(10), encoding="utf-8")
+
+
+@app.get("/configuracao")
+def ler_configuracao(req: Request):
+    """Estado da chave. NUNCA devolve a chave, so a mascara e o provedor."""
+    _so_local(req)
+    prov = llm.provedor_atual()
+    return {"configurado": llm.disponivel(),
+            "provedor": prov["nome"] if prov else None,
+            "rotulo": prov["rotulo"] if prov else None,
+            "modelo": llm.modelo_atual(),
+            "mascara": llm.mascarar(os.environ.get("PET_LLM_CHAVE")
+                                    or os.environ.get("ANTHROPIC_API_KEY")),
+            "provedores": [{"rotulo": p["rotulo"], "prefixos": list(p["prefixos"]),
+                            "modelo": p["modelo"]} for p in llm.PROVEDORES]}
+
+
+@app.post("/configuracao")
+def gravar_configuracao(corpo: Configuracao, req: Request):
+    """Testa a chave antes de gravar. Chave vazia remove a configuracao."""
+    _so_local(req)
+    chave = corpo.chave.strip()
+
+    if not chave:
+        os.environ.pop("PET_LLM_CHAVE", None)
+        os.environ.pop("PET_LLM_MODELO", None)
+        _gravar_env("", "")
+        return {"ok": True, "configurado": False, "mensagem": "chave removida"}
+
+    # Testa ANTES de gravar: melhor recusar na tela do que descobrir no meio
+    # do evento que a chave nao serve.
+    resultado = llm.testar(chave, corpo.modelo.strip())
+    if not resultado["ok"]:
+        return {"ok": False, "configurado": llm.disponivel(), **resultado}
+
+    os.environ["PET_LLM_CHAVE"] = chave
+    if corpo.modelo.strip():
+        os.environ["PET_LLM_MODELO"] = corpo.modelo.strip()
+    else:
+        os.environ.pop("PET_LLM_MODELO", None)
+    _gravar_env(chave, corpo.modelo.strip())
+
+    return {"ok": True, "configurado": True, **resultado,
+            "mascara": llm.mascarar(chave)}
 
 
 @app.get("/metricas")

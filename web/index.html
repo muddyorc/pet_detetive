@@ -36,6 +36,30 @@
   .pastilha.ok { color: var(--destaque); border-color: #1e5d54; }
   .pastilha.off { color: var(--alerta); border-color: #6b4e13; }
 
+  .engrenagem { appearance: none; background: none; border: 1px solid var(--borda);
+                color: var(--fraco); font-size: 17px; line-height: 1; width: 34px;
+                height: 34px; border-radius: 9px; cursor: pointer; }
+  .engrenagem:hover { color: var(--texto); border-color: #3a4152; }
+
+  .fundo-modal { position: fixed; inset: 0; background: rgba(0,0,0,.72);
+                 display: flex; align-items: center; justify-content: center;
+                 padding: 20px; z-index: 50; }
+  .modal { background: var(--painel); border: 1px solid var(--borda);
+           border-radius: 14px; padding: 22px; width: 100%; max-width: 470px; }
+  .modal h2 { font-size: 17px; margin: 0 0 10px; }
+  .modal input { width: 100%; margin-top: 10px; background: #0a0c10;
+                 border: 1px solid var(--borda); color: var(--texto);
+                 border-radius: 9px; padding: 12px 14px; font-size: 14px;
+                 font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .modal input:focus { outline: none; border-color: var(--destaque); }
+  .modal code { background: #0a0c10; padding: 1px 5px; border-radius: 4px;
+                font-size: 12px; }
+  .detectado { font-size: 13px; color: var(--fraco); margin-top: 7px; min-height: 19px; }
+  .detectado.ok { color: var(--destaque); }
+  .resultado-config { font-size: 13px; margin-top: 13px; min-height: 19px; }
+  .resultado-config.ok  { color: var(--destaque); }
+  .resultado-config.erro { color: var(--alerta); }
+
   .envio { display: flex; gap: 12px; flex-wrap: wrap; margin: 24px 0 8px; }
   .botao {
     appearance: none; border: 1px solid var(--borda); background: var(--painel);
@@ -159,7 +183,38 @@
     <h1>Pet Detetive</h1>
     <span class="subtitulo">com quais raças o seu pet mais se parece</span>
     <div class="estado" id="estado"></div>
+    <button class="engrenagem" id="botao-config" title="configurar a chave de API"
+            aria-label="configurar">⚙</button>
   </header>
+
+  <!-- Mini-tela da chave. Só é alcançável da própria máquina: a API recusa
+       /configuracao vindo da rede (ver _so_local em api.py). -->
+  <div class="fundo-modal escondido" id="modal">
+    <div class="modal">
+      <h2>Chave de API</h2>
+      <p class="nota" style="margin-top:0">
+        O sistema <strong>funciona sem chave</strong>: o perfil e as respostas saem
+        do modelo local. A chave só habilita o botão de aprofundar na nuvem.
+        O provedor é reconhecido pelo prefixo.
+      </p>
+      <input type="password" id="campo-chave" autocomplete="off" spellcheck="false"
+             placeholder="cole a chave aqui">
+      <div class="detectado" id="detectado"></div>
+      <input type="text" id="campo-modelo" autocomplete="off" spellcheck="false"
+             placeholder="modelo (opcional — deixe vazio para o padrão)">
+      <div class="linha" style="margin-top:14px">
+        <button class="botao principal" id="salvar-chave">Testar e salvar</button>
+        <button class="botao" id="remover-chave">Remover</button>
+        <button class="botao" id="fechar-modal">Fechar</button>
+      </div>
+      <div class="resultado-config" id="resultado-config"></div>
+      <p class="nota">
+        Gravada em <code>.env</code>, que está no <code>.gitignore</code> — não vai
+        para o GitHub. A foto continua nunca saindo daqui: para a nuvem vão apenas
+        o nome da raça, a sua pergunta e o texto da base local.
+      </p>
+    </div>
+  </div>
 
   <div class="envio">
     <label class="botao principal" for="arquivo">Escolher uma foto</label>
@@ -632,6 +687,93 @@ $('botao-perfil').onclick = async () => {
     $('perfil').textContent = 'não consegui montar o perfil agora.';
   } finally { $('botao-perfil').disabled = false; }
 };
+
+/* ------------------------------------------------------------------
+   Tela da chave de API.
+
+   O servidor recusa /configuracao vindo da rede (_so_local em api.py): com
+   --rede qualquer pessoa no Wi-Fi alcança a API, e ler ou gravar a chave
+   pela rede seria entregá-la a quem estiver na sala. A bancada configura no
+   próprio notebook.
+
+   A chave NUNCA volta do servidor — só a máscara e o provedor. -------- */
+let PROVEDORES = [];
+
+function detectar(chave) {
+  const c = (chave || '').trim();
+  if (!c) return null;
+  for (const p of PROVEDORES) {
+    if (p.prefixos.some((pre) => c.startsWith(pre))) return p;
+  }
+  return null;
+}
+
+async function abrirConfig() {
+  const r = await fetch('/configuracao');
+  if (r.status === 403) {
+    $('aviso').textContent =
+      'a chave só pode ser configurada na própria máquina (abra em localhost)';
+    return;
+  }
+  const c = await r.json();
+  PROVEDORES = c.provedores || [];
+  $('campo-chave').value = '';
+  $('campo-modelo').value = c.modelo || '';
+  $('resultado-config').className = 'resultado-config';
+  $('resultado-config').textContent = c.configurado
+    ? `configurada: ${c.rotulo} · ${c.mascara} · modelo ${c.modelo}`
+    : 'nenhuma chave configurada — o sistema está usando só o modelo local';
+  $('detectado').textContent = '';
+  $('modal').classList.remove('escondido');
+  $('campo-chave').focus();
+}
+
+$('campo-chave').oninput = (e) => {
+  const p = detectar(e.target.value);
+  const d = $('detectado');
+  d.className = 'detectado' + (p ? ' ok' : '');
+  d.textContent = p
+    ? `reconhecido: ${p.rotulo} · modelo padrão ${p.modelo}`
+    : (e.target.value.trim() ? 'prefixo não reconhecido' : '');
+};
+
+async function salvarChave(chave) {
+  const r = $('resultado-config');
+  r.className = 'resultado-config';
+  r.textContent = chave ? 'testando a chave…' : 'removendo…';
+  $('salvar-chave').disabled = $('remover-chave').disabled = true;
+  try {
+    const resp = await fetch('/configuracao', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chave, modelo: $('campo-modelo').value.trim() }),
+    });
+    const d = await resp.json();
+    r.className = 'resultado-config ' + (d.ok ? 'ok' : 'erro');
+    if (d.ok && d.configurado) {
+      r.textContent = `funcionou: ${d.rotulo} · ${d.modelo} · ${d.latencia_ms} ms`;
+      $('campo-chave').value = '';
+    } else if (d.ok) {
+      r.textContent = 'chave removida — voltou a usar só o modelo local';
+    } else {
+      r.textContent = d.erro || 'não consegui validar a chave';
+    }
+    carregarSaude();
+  } catch {
+    r.className = 'resultado-config erro';
+    r.textContent = 'não consegui falar com a API';
+  } finally {
+    $('salvar-chave').disabled = $('remover-chave').disabled = false;
+  }
+}
+
+$('botao-config').onclick = abrirConfig;
+$('fechar-modal').onclick = () => $('modal').classList.add('escondido');
+$('modal').onclick = (e) => { if (e.target === $('modal')) $('modal').classList.add('escondido'); };
+$('salvar-chave').onclick = () => salvarChave($('campo-chave').value.trim());
+$('remover-chave').onclick = () => salvarChave('');
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') $('modal').classList.add('escondido');
+});
 
 carregarSaude();
 carregarExemplos();

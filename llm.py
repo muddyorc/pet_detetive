@@ -1,27 +1,44 @@
-"""Cliente do LLM em nuvem. Monta o perfil longo da raca.
+"""Cliente do LLM em nuvem. Perfil longo e perguntas abertas.
 
 E a UNICA parte do sistema que fala com a internet, e por isso a mais
 cuidadosa. Tres regras, nessa ordem de importancia:
 
-1. NUNCA RECEBE IMAGEM. O que sobe e o nome da raca e os trechos da base de
-   conhecimento local -- texto que ja estava no repositorio antes do visitante
-   chegar. A foto, o tensor e o mapa de atencao nao saem da maquina. Esse e o
-   argumento central de privacidade do projeto (restricoes 2 e 6 do CLAUDE.md);
-   se a imagem subir, a tese cai. Veja `_montar_contexto`: ela recebe str, nao
-   bytes, e nao existe caminho no modulo que aceite PIL.Image.
+1. NUNCA RECEBE IMAGEM. O que sobe e o nome da raca, a pergunta digitada e os
+   trechos da base de conhecimento local -- texto que ja estava no repositorio
+   antes do visitante chegar. A foto, o tensor e o mapa de atencao nao saem da
+   maquina. Esse e o argumento central de privacidade (restricoes 2 e 6 do
+   CLAUDE.md). Toda funcao publica daqui recebe `str`, nunca `bytes`, e nao
+   existe caminho neste modulo que aceite PIL.Image.
 
-2. TIMEOUT CURTO E FALLBACK. Sem chave, sem rede ou com a API lenta, o perfil
-   e gerado pelo SLM local. O visitante nunca ve um erro, so um texto um pouco
-   mais simples. `perfil()` nao levanta excecao em operacao normal.
+2. TIMEOUT CURTO E FALLBACK. Sem chave, sem rede ou com a API lenta, o texto e
+   gerado pelo SLM local. O visitante nunca ve um erro, so um texto mais
+   simples.
 
-3. UMA CHAMADA POR VISITANTE. Perfil longo e a unica tarefa que vai para a
-   nuvem; legenda, pergunta e extracao sao do SLM local (restricao 4).
+3. UMA CHAMADA POR VISITANTE NO CAMINHO PADRAO. Legenda, pergunta de
+   refinamento e extracao sao sempre locais (restricao 4).
+
+VARIOS PROVEDORES
+-----------------
+A chave e identificada pelo prefixo e cada familia tem seu jeito de falar:
+
+    sk-ant-...   Anthropic    SDK oficial `anthropic`
+    AIza...      Gemini       REST propria do Google
+    sk-or-...    OpenRouter   |
+    gsk_...      Groq         |  todas falam o mesmo dialeto
+    sk-proj-...  OpenAI       |  /chat/completions, entao um cliente
+    sk-...       OpenAI       |  HTTP cobre as quatro
+
+Para Anthropic usamos o SDK oficial. Para as compativeis com OpenAI usamos
+`requests` direto, em vez de instalar mais um SDK: o endpoint e estavel,
+documentado, e o projeto ja depende de `requests` para falar com o Ollama.
 """
 
 from __future__ import annotations
 
 import os
 import time
+
+import requests
 
 # O .env e opcional: sem ele o modulo cai no SLM local em vez de quebrar.
 try:
@@ -31,11 +48,28 @@ try:
 except ImportError:
     pass
 
-MODELO = os.environ.get("PET_LLM_MODELO", "claude-opus-5-5")
-
 # Timeout curto de proposito: numa bancada, dez segundos de silencio ja e
-# tempo demais. Estourou, cai no SLM local, que responde em menos de um.
-TIMEOUT_S = float(os.environ.get("PET_LLM_TIMEOUT", "12"))
+# tempo demais. Estourou, cai no SLM local, que responde em poucos segundos.
+TIMEOUT_S = float(os.environ.get("PET_LLM_TIMEOUT", "20"))
+
+# A ordem importa: "sk-ant-", "sk-or-" e "sk-proj-" precisam ser testados
+# antes do "sk-" solto, senao tudo vira OpenAI.
+PROVEDORES: list[dict] = [
+    {"nome": "anthropic", "rotulo": "Anthropic (Claude)", "prefixos": ("sk-ant-",),
+     "tipo": "anthropic", "modelo": "claude-opus-5-5"},
+    {"nome": "openrouter", "rotulo": "OpenRouter", "prefixos": ("sk-or-",),
+     "tipo": "openai", "base": "https://openrouter.ai/api/v1",
+     "modelo": "anthropic/claude-sonnet-4.5"},
+    {"nome": "groq", "rotulo": "Groq", "prefixos": ("gsk_",),
+     "tipo": "openai", "base": "https://api.groq.com/openai/v1",
+     "modelo": "llama-3.3-70b-versatile"},
+    {"nome": "gemini", "rotulo": "Google Gemini", "prefixos": ("AIza",),
+     "tipo": "gemini", "base": "https://generativelanguage.googleapis.com/v1beta",
+     "modelo": "gemini-2.0-flash"},
+    {"nome": "openai", "rotulo": "OpenAI", "prefixos": ("sk-proj-", "sk-"),
+     "tipo": "openai", "base": "https://api.openai.com/v1",
+     "modelo": "gpt-4o-mini"},
+]
 
 SISTEMA = (
     "Voce escreve perfis curtos de racas de caes e gatos para uma feira de "
@@ -44,11 +78,24 @@ SISTEMA = (
     "- Use SOMENTE os dados fornecidos. Nao acrescente fatos que nao estejam "
     "neles: a base existe justamente para impedir invencao.\n"
     "- A rede neural compara a foto com 37 racas puras e mede SEMELHANCA "
-    "VISUAL. Nunca escreva 'composicao', 'porcentagem de raca', 'DNA', "
-    "'ancestralidade' ou 'o animal e da raca X'. Escreva 'se parece com'.\n"
+    "VISUAL. Escreva sempre 'se parece com' ou 'lembra'.\n"
     "- Portugues do Brasil, tom sobrio e direto, sem linguagem de catalogo de "
-    "canil ('companheiro leal e amoroso' e exatamente o que nao queremos).\n"
+    "canil ('companheiro leal e amoroso' e o que nao queremos).\n"
     "- Tres paragrafos curtos, no maximo 140 palavras no total."
+)
+
+SISTEMA_PERGUNTA = (
+    "Voce responde perguntas de visitantes de uma feira de ciencias sobre "
+    "racas de caes e gatos, a partir de uma base de conhecimento fornecida.\n\n"
+    "REGRAS:\n"
+    "- Responda a pergunta DIRETAMENTE, na primeira frase.\n"
+    "- Use os dados fornecidos como base. Se a pergunta exigir algo que nao "
+    "esta neles, diga o que a base sustenta e seja explicito sobre o que e "
+    "inferencia sua.\n"
+    "- Se a pergunta nao for sobre o animal, diga isso em uma frase.\n"
+    "- A rede mede SEMELHANCA VISUAL com 37 racas puras. Fale em termos de "
+    "aparencia: 'se parece com', 'lembra'.\n"
+    "- Portugues do Brasil, tom sobrio. No maximo 4 frases."
 )
 
 
@@ -56,24 +103,209 @@ class SemNuvem(RuntimeError):
     """Sem chave, sem rede ou a API recusou. Quem chama usa o SLM local."""
 
 
+# ----------------------------------------------------------------------
+# Identificacao da chave
+# ----------------------------------------------------------------------
+
 def _chave() -> str | None:
-    return os.environ.get("ANTHROPIC_API_KEY") or None
+    return (os.environ.get("PET_LLM_CHAVE")
+            or os.environ.get("ANTHROPIC_API_KEY")
+            or None)
+
+
+def identificar(chave: str | None) -> dict | None:
+    """Qual provedor essa chave e. None se nao reconhecer o prefixo."""
+    if not chave:
+        return None
+    limpa = chave.strip()
+    for p in PROVEDORES:
+        if any(limpa.startswith(pre) for pre in p["prefixos"]):
+            return p
+    return None
+
+
+def provedor_atual() -> dict | None:
+    """Provedor em uso, respeitando um override manual de PET_LLM_PROVEDOR."""
+    chave = _chave()
+    if not chave:
+        return None
+    forcado = os.environ.get("PET_LLM_PROVEDOR")
+    if forcado:
+        for p in PROVEDORES:
+            if p["nome"] == forcado:
+                return p
+    return identificar(chave)
+
+
+def modelo_atual() -> str:
+    p = provedor_atual()
+    return os.environ.get("PET_LLM_MODELO") or (p["modelo"] if p else "")
+
+
+def mascarar(chave: str | None) -> str:
+    """Nunca devolvemos a chave inteira para a interface."""
+    if not chave:
+        return ""
+    limpa = chave.strip()
+    return f"{limpa[:7]}…{limpa[-4:]}" if len(limpa) > 14 else "…"
 
 
 def disponivel() -> bool:
-    """True se ha chave configurada E o SDK esta instalado.
+    """True se ha chave reconhecida e o cliente dela existe.
 
-    Nao faz chamada de rede: isso e consultado pelo GET /saude a cada
-    carregamento da pagina, e nao vale gastar uma requisicao por visita.
+    Nao faz chamada de rede: o GET /saude consulta isso a cada carga de
+    pagina, e nao vale gastar uma requisicao por visita.
     """
-    if not _chave():
+    p = provedor_atual()
+    if p is None:
         return False
-    try:
-        import anthropic  # noqa: F401
-    except ImportError:
-        return False
+    if p["tipo"] == "anthropic":
+        try:
+            import anthropic  # noqa: F401
+        except ImportError:
+            return False
     return True
 
+
+# ----------------------------------------------------------------------
+# Um transporte por familia de API
+# ----------------------------------------------------------------------
+
+def _via_anthropic(p: dict, chave: str, sistema: str,
+                   mensagens: list[dict], max_tokens: int) -> tuple[str, dict]:
+    import anthropic
+
+    cliente = anthropic.Anthropic(api_key=chave, timeout=TIMEOUT_S, max_retries=1)
+    try:
+        r = cliente.beta.messages.create(
+            model=modelo_atual() or p["modelo"],
+            max_tokens=max_tokens,
+            # Tarefa curta a partir de dados prontos: nao pede raciocinio
+            # profundo, e esforco baixo corta a latencia.
+            output_config={"effort": "low"},
+            # Se o classificador de seguranca recusar, a propria API refaz a
+            # chamada noutro modelo em vez de devolver resposta vazia.
+            betas=["server-side-fallback-2026-07-01"],
+            fallbacks="default",
+            system=sistema,
+            messages=mensagens,
+        )
+    except anthropic.APIError as e:
+        raise SemNuvem(f"{p['rotulo']}: {e}") from e
+    except Exception as e:
+        raise SemNuvem(f"{p['rotulo']}: falha de rede: {e}") from e
+
+    if r.stop_reason == "refusal":
+        raise SemNuvem(f"{p['rotulo']}: a API recusou a solicitacao")
+    texto = "".join(b.text for b in r.content if b.type == "text").strip()
+    return texto, {"tokens_entrada": r.usage.input_tokens,
+                   "tokens_saida": r.usage.output_tokens}
+
+
+def _via_openai(p: dict, chave: str, sistema: str,
+                mensagens: list[dict], max_tokens: int) -> tuple[str, dict]:
+    """Dialeto /chat/completions: OpenAI, Groq, OpenRouter e compativeis."""
+    base = os.environ.get("PET_LLM_BASE") or p["base"]
+    corpo = {
+        "model": modelo_atual() or p["modelo"],
+        "max_tokens": max_tokens,
+        "messages": [{"role": "system", "content": sistema}] + mensagens,
+    }
+    try:
+        r = requests.post(f"{base}/chat/completions", json=corpo,
+                          headers={"Authorization": f"Bearer {chave}"},
+                          timeout=TIMEOUT_S)
+        if r.status_code >= 400:
+            raise SemNuvem(f"{p['rotulo']}: HTTP {r.status_code} — {r.text[:160]}")
+        d = r.json()
+    except requests.RequestException as e:
+        raise SemNuvem(f"{p['rotulo']}: falha de rede: {e}") from e
+
+    escolhas = d.get("choices") or []
+    texto = (escolhas[0].get("message", {}).get("content") or "").strip() if escolhas else ""
+    uso = d.get("usage") or {}
+    return texto, {"tokens_entrada": uso.get("prompt_tokens", 0),
+                   "tokens_saida": uso.get("completion_tokens", 0)}
+
+
+def _via_gemini(p: dict, chave: str, sistema: str,
+                mensagens: list[dict], max_tokens: int) -> tuple[str, dict]:
+    base = os.environ.get("PET_LLM_BASE") or p["base"]
+    modelo = modelo_atual() or p["modelo"]
+    # O Gemini chama o papel do modelo de "model", nao "assistant".
+    conteudo = [{"role": "model" if m["role"] == "assistant" else "user",
+                 "parts": [{"text": m["content"]}]} for m in mensagens]
+    corpo = {"contents": conteudo,
+             "systemInstruction": {"parts": [{"text": sistema}]},
+             "generationConfig": {"maxOutputTokens": max_tokens}}
+    try:
+        r = requests.post(f"{base}/models/{modelo}:generateContent",
+                          json=corpo, headers={"x-goog-api-key": chave},
+                          timeout=TIMEOUT_S)
+        if r.status_code >= 400:
+            raise SemNuvem(f"{p['rotulo']}: HTTP {r.status_code} — {r.text[:160]}")
+        d = r.json()
+    except requests.RequestException as e:
+        raise SemNuvem(f"{p['rotulo']}: falha de rede: {e}") from e
+
+    candidatos = d.get("candidates") or []
+    partes = candidatos[0].get("content", {}).get("parts", []) if candidatos else []
+    texto = "".join(x.get("text", "") for x in partes).strip()
+    uso = d.get("usageMetadata") or {}
+    return texto, {"tokens_entrada": uso.get("promptTokenCount", 0),
+                   "tokens_saida": uso.get("candidatesTokenCount", 0)}
+
+
+_TRANSPORTES = {"anthropic": _via_anthropic, "openai": _via_openai,
+                "gemini": _via_gemini}
+
+
+def _chamar(sistema: str, mensagens: list[dict],
+            max_tokens: int = 1000) -> tuple[str, dict]:
+    """Despacha para o provedor da chave. Levanta SemNuvem em qualquer falha."""
+    p = provedor_atual()
+    chave = _chave()
+    if p is None or not chave:
+        raise SemNuvem("sem chave de API configurada")
+
+    t0 = time.perf_counter()
+    texto, uso = _TRANSPORTES[p["tipo"]](p, chave, sistema, mensagens, max_tokens)
+    if not texto:
+        raise SemNuvem(f"{p['rotulo']}: resposta vazia")
+    return texto, {"rota": "nuvem", "provedor": p["nome"],
+                   "modelo": modelo_atual() or p["modelo"],
+                   "latencia_ms": (time.perf_counter() - t0) * 1000, **uso}
+
+
+def testar(chave: str, modelo: str = "") -> dict:
+    """Chamada minima, para a tela de configuracao dizer se a chave serve."""
+    p = identificar(chave)
+    if p is None:
+        return {"ok": False, "erro": "prefixo de chave nao reconhecido"}
+
+    antes = (os.environ.get("PET_LLM_CHAVE"), os.environ.get("PET_LLM_MODELO"))
+    os.environ["PET_LLM_CHAVE"] = chave.strip()
+    if modelo:
+        os.environ["PET_LLM_MODELO"] = modelo
+    try:
+        texto, tel = _chamar("Responda com uma palavra.",
+                             [{"role": "user", "content": "Diga: ok"}], max_tokens=16)
+        return {"ok": True, "provedor": p["nome"], "rotulo": p["rotulo"],
+                "modelo": tel["modelo"], "latencia_ms": round(tel["latencia_ms"]),
+                "resposta": texto[:60]}
+    except SemNuvem as e:
+        return {"ok": False, "provedor": p["nome"], "erro": str(e)}
+    finally:
+        for nome, valor in zip(("PET_LLM_CHAVE", "PET_LLM_MODELO"), antes):
+            if valor is None:
+                os.environ.pop(nome, None)
+            else:
+                os.environ[nome] = valor
+
+
+# ----------------------------------------------------------------------
+# As duas tarefas do projeto
+# ----------------------------------------------------------------------
 
 def _montar_contexto(raca: str, trechos: list[str]) -> str:
     """Monta o texto que sobe para a nuvem.
@@ -87,130 +319,28 @@ def _montar_contexto(raca: str, trechos: list[str]) -> str:
             f"Escreva o perfil.")
 
 
-def _pela_nuvem(raca: str, trechos: list[str]) -> tuple[str, dict]:
-    import anthropic
-
-    cliente = anthropic.Anthropic(timeout=TIMEOUT_S, max_retries=1)
-    t0 = time.perf_counter()
-    try:
-        r = cliente.beta.messages.create(
-            model=MODELO,
-            max_tokens=1000,
-            # Perfil curto a partir de dados prontos: nao e tarefa que peca
-            # raciocinio profundo, e esforco baixo corta a latencia.
-            output_config={"effort": "low"},
-            # Se o classificador de seguranca recusar, a propria API refaz a
-            # chamada noutro modelo em vez de devolver resposta vazia.
-            betas=["server-side-fallback-2026-07-01"],
-            fallbacks="default",
-            system=SISTEMA,
-            messages=[{"role": "user", "content": _montar_contexto(raca, trechos)}],
-        )
-    except anthropic.APIError as e:
-        raise SemNuvem(f"API respondeu com erro: {e}") from e
-    except Exception as e:  # timeout, DNS, rede caida
-        raise SemNuvem(f"falha de rede: {e}") from e
-
-    if r.stop_reason == "refusal":
-        raise SemNuvem("a API recusou a solicitacao")
-
-    texto = "".join(b.text for b in r.content if b.type == "text").strip()
-    if not texto:
-        raise SemNuvem("resposta vazia")
-
-    return texto, {
-        "rota": "nuvem",
-        "modelo": MODELO,
-        "latencia_ms": (time.perf_counter() - t0) * 1000,
-        "tokens_entrada": r.usage.input_tokens,
-        "tokens_saida": r.usage.output_tokens,
-    }
-
-
-SISTEMA_PERGUNTA = (
-    "Voce responde perguntas de visitantes de uma feira de ciencias sobre racas "
-    "de caes e gatos, a partir de uma base de conhecimento fornecida.\n\n"
-    "REGRAS:\n"
-    "- Responda a pergunta DIRETAMENTE, na primeira frase.\n"
-    "- Use os dados fornecidos como base. Se a pergunta exigir algo que nao "
-    "esta neles, diga o que a base sustenta e seja explicito sobre o que e "
-    "inferencia sua.\n"
-    "- Se a pergunta nao for sobre o animal, diga isso em uma frase.\n"
-    "- A rede neural mede SEMELHANCA VISUAL com 37 racas puras. Fale em termos "
-    "de aparencia: 'se parece com', 'lembra'.\n"
-    "- Portugues do Brasil, tom sobrio. No maximo 4 frases."
-)
-
-
 def responder(pergunta: str, trechos: list[str],
               historico: list[dict] | None = None) -> tuple[str, dict]:
     """Pergunta aberta do visitante, respondida pela nuvem.
 
-    Recebe a pergunta (texto que o visitante digitou) e os trechos que o RAG
-    recuperou. **Nunca a imagem** -- vale a mesma garantia de `perfil()`: a
-    assinatura aceita str, e nao existe caminho neste modulo que leve bytes de
-    foto para a rede.
-
     O historico e so texto da propria conversa, para o modelo nao repetir o
-    que ja disse.
+    que ja disse. Nunca contem imagem.
     """
-    if not disponivel():
-        raise SemNuvem("sem ANTHROPIC_API_KEY configurada")
-
-    import anthropic
-
     corpo = "\n".join(f"- {t}" for t in trechos)
-    mensagens: list[dict] = []
-    for turno in (historico or [])[-6:]:          # 3 trocas bastam de contexto
-        mensagens.append({"role": turno["papel"], "content": turno["texto"]})
-    mensagens.append({
-        "role": "user",
-        "content": f"Base de conhecimento:\n{corpo}\n\nPergunta do visitante: {pergunta}",
-    })
-
-    cliente = anthropic.Anthropic(timeout=TIMEOUT_S, max_retries=1)
-    t0 = time.perf_counter()
-    try:
-        r = cliente.beta.messages.create(
-            model=MODELO,
-            max_tokens=1000,
-            output_config={"effort": "low"},
-            betas=["server-side-fallback-2026-07-01"],
-            fallbacks="default",
-            system=SISTEMA_PERGUNTA,
-            messages=mensagens,
-        )
-    except anthropic.APIError as e:
-        raise SemNuvem(f"API respondeu com erro: {e}") from e
-    except Exception as e:
-        raise SemNuvem(f"falha de rede: {e}") from e
-
-    if r.stop_reason == "refusal":
-        raise SemNuvem("a API recusou a solicitacao")
-
-    texto = "".join(b.text for b in r.content if b.type == "text").strip()
-    if not texto:
-        raise SemNuvem("resposta vazia")
-
-    return texto, {
-        "rota": "nuvem",
-        "modelo": MODELO,
-        "latencia_ms": (time.perf_counter() - t0) * 1000,
-        "tokens_entrada": r.usage.input_tokens,
-        "tokens_saida": r.usage.output_tokens,
-    }
+    mensagens = [{"role": t["papel"], "content": t["texto"]}
+                 for t in (historico or [])[-6:]]      # 3 trocas de contexto
+    mensagens.append({"role": "user",
+                      "content": f"Base de conhecimento:\n{corpo}\n\n"
+                                 f"Pergunta do visitante: {pergunta}"})
+    return _chamar(SISTEMA_PERGUNTA, mensagens)
 
 
 def _pelo_slm(raca: str, trechos: list[str]) -> tuple[str, dict]:
     """Fallback local. Texto mais simples, mesma garantia de nao inventar."""
     import slm
 
-    texto, tel = slm.gerar(
-        _montar_contexto(raca, trechos),
-        sistema=SISTEMA,
-        temperatura=0.4,
-        max_tokens=220,
-    )
+    texto, tel = slm.gerar(_montar_contexto(raca, trechos), sistema=SISTEMA,
+                           temperatura=0.4, max_tokens=220)
     tel["rota"] = "local"
     return texto, tel
 
@@ -222,15 +352,16 @@ def perfil(raca: str, trechos: list[str]) -> tuple[str, dict]:
     diz em `telemetria["rota"]` de onde ele veio. A interface mostra a rota, o
     que transforma o modo degradado em informacao, nao em erro.
     """
+    motivo = ""
     if disponivel():
         try:
-            return _pela_nuvem(raca, trechos)
+            return _chamar(SISTEMA,
+                           [{"role": "user",
+                             "content": _montar_contexto(raca, trechos)}])
         except SemNuvem as e:
             motivo = str(e)
-        else:
-            motivo = ""
     else:
-        motivo = "sem ANTHROPIC_API_KEY configurada"
+        motivo = "sem chave de API configurada"
 
     try:
         texto, tel = _pelo_slm(raca, trechos)
@@ -247,18 +378,24 @@ def perfil(raca: str, trechos: list[str]) -> tuple[str, dict]:
 if __name__ == "__main__":
     import rag
 
-    print(f"modelo:    {MODELO}")
-    print(f"chave:     {'configurada' if _chave() else 'AUSENTE'}")
-    print(f"nuvem:     {'disponivel' if disponivel() else 'indisponivel (usa SLM local)'}")
+    p = provedor_atual()
+    print(f"chave:    {mascarar(_chave()) or 'AUSENTE'}")
+    print(f"provedor: {p['rotulo'] if p else 'nenhum'}")
+    print(f"modelo:   {modelo_atual() or '—'}")
+    print(f"nuvem:    {'disponivel' if disponivel() else 'indisponivel (usa SLM local)'}")
+
+    print("\nprefixos reconhecidos:")
+    for prov in PROVEDORES:
+        print(f"  {'  '.join(prov['prefixos']):22} {prov['rotulo']}")
 
     trechos = [str(t) for t in rag.indice().perfil_bruto("Pug")]
     print(f"\ncontexto que subiria ({len(trechos)} trechos, so texto da base):")
-    for t in trechos[:3]:
-        print(f"  {t[:76]}...")
+    for t in trechos[:2]:
+        print(f"  {t[:74]}...")
 
     print("\ngerando perfil...")
     texto, tel = perfil("Pug", trechos)
     print(f"\n--- rota: {tel['rota']} ({tel['latencia_ms']:.0f} ms) ---")
-    print(texto)
+    print(texto[:280])
     if tel.get("motivo_fallback"):
         print(f"\n[fallback porque: {tel['motivo_fallback']}]")
