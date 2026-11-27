@@ -91,6 +91,8 @@ class Resposta(BaseModel):
 class Configuracao(BaseModel):
     chave: str = ""
     modelo: str = ""
+    provedor: str = ""          # vence a deteccao por prefixo
+    base: str = ""              # endpoint proprio, para compativeis com OpenAI
 
 
 class Pergunta(BaseModel):
@@ -200,16 +202,22 @@ def _so_local(req: Request) -> None:
         raise HTTPException(403, "a chave so pode ser configurada na propria maquina")
 
 
-def _gravar_env(chave: str, modelo: str) -> None:
+def _gravar_env(chave: str, modelo: str, provedor: str = "",
+                base: str = "") -> None:
     """Reescreve as linhas do projeto no .env, preservando o resto."""
     linhas = []
     if CAMINHO_ENV.exists():
         linhas = [l for l in CAMINHO_ENV.read_text(encoding="utf-8").splitlines()
-                  if not l.startswith(("PET_LLM_CHAVE=", "PET_LLM_MODELO="))]
+                  if not l.startswith(("PET_LLM_CHAVE=", "PET_LLM_MODELO=",
+                                        "PET_LLM_PROVEDOR=", "PET_LLM_BASE="))]
     if chave:
         linhas.append(f"PET_LLM_CHAVE={chave}")
         if modelo:
             linhas.append(f"PET_LLM_MODELO={modelo}")
+        if provedor:
+            linhas.append(f"PET_LLM_PROVEDOR={provedor}")
+        if base:
+            linhas.append(f"PET_LLM_BASE={base}")
     CAMINHO_ENV.write_text(chr(10).join(linhas) + chr(10), encoding="utf-8")
 
 
@@ -224,7 +232,8 @@ def ler_configuracao(req: Request):
             "modelo": llm.modelo_atual(),
             "mascara": llm.mascarar(os.environ.get("PET_LLM_CHAVE")
                                     or os.environ.get("ANTHROPIC_API_KEY")),
-            "provedores": [{"rotulo": p["rotulo"], "prefixos": list(p["prefixos"]),
+            "provedores": [{"nome": p["nome"], "rotulo": p["rotulo"],
+                            "prefixos": list(p["prefixos"]),
                             "modelo": p["modelo"]} for p in llm.PROVEDORES]}
 
 
@@ -235,23 +244,29 @@ def gravar_configuracao(corpo: Configuracao, req: Request):
     chave = corpo.chave.strip()
 
     if not chave:
-        os.environ.pop("PET_LLM_CHAVE", None)
-        os.environ.pop("PET_LLM_MODELO", None)
+        for nome in ("PET_LLM_CHAVE", "PET_LLM_MODELO",
+                     "PET_LLM_PROVEDOR", "PET_LLM_BASE"):
+            os.environ.pop(nome, None)
         _gravar_env("", "")
         return {"ok": True, "configurado": False, "mensagem": "chave removida"}
 
     # Testa ANTES de gravar: melhor recusar na tela do que descobrir no meio
     # do evento que a chave nao serve.
-    resultado = llm.testar(chave, corpo.modelo.strip())
+    resultado = llm.testar(chave, corpo.modelo.strip(),
+                           corpo.provedor.strip(), corpo.base.strip())
     if not resultado["ok"]:
         return {"ok": False, "configurado": llm.disponivel(), **resultado}
 
+    prov = resultado["provedor"]
     os.environ["PET_LLM_CHAVE"] = chave
-    if corpo.modelo.strip():
-        os.environ["PET_LLM_MODELO"] = corpo.modelo.strip()
-    else:
-        os.environ.pop("PET_LLM_MODELO", None)
-    _gravar_env(chave, corpo.modelo.strip())
+    os.environ["PET_LLM_PROVEDOR"] = prov
+    for nome, valor in (("PET_LLM_MODELO", corpo.modelo.strip()),
+                        ("PET_LLM_BASE", corpo.base.strip())):
+        if valor:
+            os.environ[nome] = valor
+        else:
+            os.environ.pop(nome, None)
+    _gravar_env(chave, corpo.modelo.strip(), prov, corpo.base.strip())
 
     return {"ok": True, "configurado": True, **resultado,
             "mascara": llm.mascarar(chave)}

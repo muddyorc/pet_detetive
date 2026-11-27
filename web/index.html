@@ -51,7 +51,11 @@
                  border: 1px solid var(--borda); color: var(--texto);
                  border-radius: 9px; padding: 12px 14px; font-size: 14px;
                  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-  .modal input:focus { outline: none; border-color: var(--destaque); }
+  .modal input:focus, .modal select:focus { outline: none;
+    border-color: var(--destaque); }
+  .modal select { width: 100%; margin-top: 10px; background: #0a0c10;
+    border: 1px solid var(--borda); color: var(--texto);
+    border-radius: 9px; padding: 12px 14px; font-size: 14px; }
   .modal code { background: #0a0c10; padding: 1px 5px; border-radius: 4px;
                 font-size: 12px; }
   .detectado { font-size: 13px; color: var(--fraco); margin-top: 7px; min-height: 19px; }
@@ -200,8 +204,15 @@
       <input type="password" id="campo-chave" autocomplete="off" spellcheck="false"
              placeholder="cole a chave aqui">
       <div class="detectado" id="detectado"></div>
+      <!-- Prefixo não é contrato: o Google mudou o formato das chaves entre
+           produtos. Quando a detecção falha, escolha aqui em vez de travar. -->
+      <select id="campo-provedor">
+        <option value="">detectar pelo prefixo</option>
+      </select>
       <input type="text" id="campo-modelo" autocomplete="off" spellcheck="false"
              placeholder="modelo (opcional — deixe vazio para o padrão)">
+      <input type="text" id="campo-base" autocomplete="off" spellcheck="false"
+             placeholder="endpoint próprio (opcional — só para compatíveis com OpenAI)">
       <div class="linha" style="margin-top:14px">
         <button class="botao principal" id="salvar-chave">Testar e salvar</button>
         <button class="botao" id="remover-chave">Remover</button>
@@ -717,6 +728,11 @@ async function abrirConfig() {
   }
   const c = await r.json();
   PROVEDORES = c.provedores || [];
+  $('campo-provedor').innerHTML =
+    '<option value="">detectar pelo prefixo</option>' +
+    PROVEDORES.map((p) => `<option value="${p.nome}">${p.rotulo}</option>`).join('');
+  $('campo-provedor').value = c.provedor || '';
+  $('campo-base').value = '';
   $('campo-chave').value = '';
   $('campo-modelo').value = c.modelo || '';
   $('resultado-config').className = 'resultado-config';
@@ -734,7 +750,9 @@ $('campo-chave').oninput = (e) => {
   d.className = 'detectado' + (p ? ' ok' : '');
   d.textContent = p
     ? `reconhecido: ${p.rotulo} · modelo padrão ${p.modelo}`
-    : (e.target.value.trim() ? 'prefixo não reconhecido' : '');
+    : (e.target.value.trim()
+        ? 'prefixo não reconhecido — escolha o provedor na lista abaixo'
+        : '');
 };
 
 async function salvarChave(chave) {
@@ -745,7 +763,12 @@ async function salvarChave(chave) {
   try {
     const resp = await fetch('/configuracao', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chave, modelo: $('campo-modelo').value.trim() }),
+      body: JSON.stringify({
+        chave,
+        modelo: $('campo-modelo').value.trim(),
+        provedor: $('campo-provedor').value,
+        base: $('campo-base').value.trim(),
+      }),
     });
     const d = await resp.json();
     r.className = 'resultado-config ' + (d.ok ? 'ok' : 'erro');

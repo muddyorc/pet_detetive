@@ -108,16 +108,38 @@ class SemNuvem(RuntimeError):
 # ----------------------------------------------------------------------
 
 def _chave() -> str | None:
-    return (os.environ.get("PET_LLM_CHAVE")
-            or os.environ.get("ANTHROPIC_API_KEY")
+    return (limpar(os.environ.get("PET_LLM_CHAVE"))
+            or limpar(os.environ.get("ANTHROPIC_API_KEY"))
             or None)
 
 
-def identificar(chave: str | None) -> dict | None:
-    """Qual provedor essa chave e. None se nao reconhecer o prefixo."""
+def limpar(chave: str | None) -> str:
+    """Tira espacos e aspas que vem junto ao colar de um painel web."""
     if not chave:
+        return ""
+    return chave.strip().strip('"').strip("'").strip()
+
+
+def por_nome(nome: str | None) -> dict | None:
+    if not nome:
         return None
-    limpa = chave.strip()
+    return next((p for p in PROVEDORES if p["nome"] == nome), None)
+
+
+def identificar(chave: str | None, provedor: str | None = None) -> dict | None:
+    """Qual provedor essa chave e.
+
+    `provedor` explicito vence o prefixo. Isso existe porque prefixo nao e
+    contrato: o Google mudou o formato das chaves entre produtos, e um usuario
+    com chave legitima ficaria travado. Quando a deteccao falha, a interface
+    oferece a escolha manual em vez de recusar.
+    """
+    escolhido = por_nome(provedor)
+    if escolhido:
+        return escolhido
+    limpa = limpar(chave)
+    if not limpa:
+        return None
     for p in PROVEDORES:
         if any(limpa.startswith(pre) for pre in p["prefixos"]):
             return p
@@ -129,12 +151,7 @@ def provedor_atual() -> dict | None:
     chave = _chave()
     if not chave:
         return None
-    forcado = os.environ.get("PET_LLM_PROVEDOR")
-    if forcado:
-        for p in PROVEDORES:
-            if p["nome"] == forcado:
-                return p
-    return identificar(chave)
+    return identificar(chave, os.environ.get("PET_LLM_PROVEDOR"))
 
 
 def modelo_atual() -> str:
@@ -277,14 +294,20 @@ def _chamar(sistema: str, mensagens: list[dict],
                    "latencia_ms": (time.perf_counter() - t0) * 1000, **uso}
 
 
-def testar(chave: str, modelo: str = "") -> dict:
+def testar(chave: str, modelo: str = "", provedor: str = "",
+           base: str = "") -> dict:
     """Chamada minima, para a tela de configuracao dizer se a chave serve."""
-    p = identificar(chave)
+    p = identificar(chave, provedor)
     if p is None:
-        return {"ok": False, "erro": "prefixo de chave nao reconhecido"}
+        return {"ok": False,
+                "erro": "nao reconheci o prefixo — escolha o provedor na lista"}
 
-    antes = (os.environ.get("PET_LLM_CHAVE"), os.environ.get("PET_LLM_MODELO"))
-    os.environ["PET_LLM_CHAVE"] = chave.strip()
+    antes = (os.environ.get("PET_LLM_CHAVE"), os.environ.get("PET_LLM_MODELO"),
+             os.environ.get("PET_LLM_PROVEDOR"), os.environ.get("PET_LLM_BASE"))
+    os.environ["PET_LLM_CHAVE"] = limpar(chave)
+    os.environ["PET_LLM_PROVEDOR"] = p["nome"]
+    if base:
+        os.environ["PET_LLM_BASE"] = base
     if modelo:
         os.environ["PET_LLM_MODELO"] = modelo
     try:
@@ -296,7 +319,8 @@ def testar(chave: str, modelo: str = "") -> dict:
     except SemNuvem as e:
         return {"ok": False, "provedor": p["nome"], "erro": str(e)}
     finally:
-        for nome, valor in zip(("PET_LLM_CHAVE", "PET_LLM_MODELO"), antes):
+        for nome, valor in zip(("PET_LLM_CHAVE", "PET_LLM_MODELO",
+                                "PET_LLM_PROVEDOR", "PET_LLM_BASE"), antes):
             if valor is None:
                 os.environ.pop(nome, None)
             else:
